@@ -2,8 +2,8 @@
 
 namespace App\Exports;
 
-use App\Models\Book;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
@@ -34,46 +34,49 @@ class BooksExport implements FromQuery, WithChunkReading, WithHeadings, WithMapp
     }
 
     /**
-     * Stream data using query instead of loading all models at once.
+     * Stream data using raw DB query instead of loading heavy Eloquent models.
      *
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return \Illuminate\Database\Query\Builder
      */
     public function query(): Builder
     {
-        $query = Book::query()->with('category');
+        $query = DB::table('books')
+            ->leftJoin('categories', 'books.category_id', '=', 'categories.id')
+            ->select('books.*', 'categories.name as joined_category_name');
 
         if (! empty($this->filters['category_id'])) {
-            $query->where('category_id', (int) $this->filters['category_id']);
+            $query->where('books.category_id', (int) $this->filters['category_id']);
         }
 
         if (! empty($this->filters['search'])) {
             $search = trim((string) $this->filters['search']);
             $query->where(function (Builder $nested) use ($search) {
-                $nested->where('title', 'like', "%{$search}%")
-                    ->orWhere('author', 'like', "%{$search}%")
-                    ->orWhere('isbn', 'like', "%{$search}%");
+                $nested->where('books.title', 'like', "%{$search}%")
+                    ->orWhere('books.author', 'like', "%{$search}%")
+                    ->orWhere('books.isbn', 'like', "%{$search}%");
             });
         }
 
         if (isset($this->filters['min_price']) && $this->filters['min_price'] !== '') {
-            $query->where('price', '>=', (float) $this->filters['min_price']);
+            $query->where('books.price', '>=', (float) $this->filters['min_price']);
         }
 
         if (isset($this->filters['max_price']) && $this->filters['max_price'] !== '') {
-            $query->where('price', '<=', (float) $this->filters['max_price']);
+            $query->where('books.price', '<=', (float) $this->filters['max_price']);
         }
 
         if (! empty($this->filters['stock_status'])) {
             if ($this->filters['stock_status'] === 'in_stock') {
-                $query->where('stock_quantity', '>', 0);
+                $query->where('books.stock_quantity', '>', 0);
             }
 
             if ($this->filters['stock_status'] === 'out_of_stock') {
-                $query->where('stock_quantity', '<=', 0);
+                $query->where('books.stock_quantity', '<=', 0);
             }
         }
 
-        return $query;
+        // Ordering is strictly required for Laravel Excel's chunk reader to work properly
+        return $query->orderBy('books.id');
     }
 
     /**
@@ -86,14 +89,15 @@ class BooksExport implements FromQuery, WithChunkReading, WithHeadings, WithMapp
             $mapped[] = match ($column) {
                 'id' => $book->id,
                 'category_id' => $book->category_id,
-                'category_name' => $book->category->name ?? 'Uncategorized',
+                'category_name' => $book->joined_category_name ?? 'Uncategorized',
                 'title' => $book->title,
                 'author' => $book->author,
                 'isbn' => $book->isbn,
                 'price' => $book->price,
                 'stock_quantity' => $book->stock_quantity,
-                'created_at' => $book->created_at ? $book->created_at->format('Y-m-d H:i:s') : '',
-                'updated_at' => $book->updated_at ? $book->updated_at->format('Y-m-d H:i:s') : '',
+                // Raw string from Query Builder, no Carbon instantiation needed
+                'created_at' => $book->created_at, 
+                'updated_at' => $book->updated_at,
                 default => null,
             };
         }
@@ -113,11 +117,11 @@ class BooksExport implements FromQuery, WithChunkReading, WithHeadings, WithMapp
     }
 
     /**
-     * Read the database in chunks of 1000.
+     * Read the database in chunks of 5000 for better throughput.
      */
     public function chunkSize(): int
     {
-        return 1000;
+        return 5000;
     }
 
     public static function availableColumns(): array

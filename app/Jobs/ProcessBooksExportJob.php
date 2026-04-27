@@ -50,7 +50,7 @@ class ProcessBooksExportJob implements ShouldQueue
             'status' => 'processing',
             'started_at' => now(),
             'error_message' => null,
-            'progress_percentage' => 10,
+            'progress_percentage' => 5, // Start at 5% to show activity
         ]);
 
         $exportLog?->update([
@@ -61,23 +61,61 @@ class ProcessBooksExportJob implements ShouldQueue
         $resultPath = 'exports/'.$filename;
 
         try {
-            if ($format === 'pdf') {
-                $export = new BooksExport($filters, $columns);
-                $books = $export->query()->get();
+            $export = new BooksExport($filters, $columns);
+            $query = $export->query();
+            $totalRows = $query->count();
+
+            if ($totalRows === 0) {
+                throw new \Exception("No records found matching your filters.");
+            }
+
+            if ($format === 'csv') {
+                // HIGH PERFORMANCE NATIVE CSV STREAMING
+                // Bypasses Laravel Excel to prevent CPU bottlenecks on massive datasets
+                $disk = Storage::disk('local');
+                $disk->makeDirectory('exports');
+                
+                $file = fopen($disk->path($resultPath), 'w');
+                
+                // Write Headers
+                fputcsv($file, $export->headings());
+
+                $processed = 0;
+                
+                // Cursor streams one row at a time instead of loading chunks into memory
+                foreach ($query->cursor() as $book) {
+                    fputcsv($file, $export->map($book));
+                    $processed++;
+
+                    // Update the UI progress bar every 10,000 rows
+                    if ($processed % 10000 === 0) {
+                        // Map the processed ratio to the 5% - 95% visual range
+                        $progress = 5 + (int) (($processed / $totalRows) * 90);
+                        $transfer->update(['progress_percentage' => min(95, $progress)]);
+                    }
+                }
+                
+                fclose($file);
+
+            } elseif ($format === 'pdf') {
+                // Safeguard against crashing the server with massive PDFs
+                if ($totalRows > 10000) {
+                    throw new \Exception("PDF export is limited to 10,000 rows to prevent memory exhaustion. Please select CSV for massive datasets.");
+                }
+
+                $books = $query->get();
                 $pdf = Pdf::loadView('admin.books.exports.pdf', [
                     'books' => $books,
                     'columns' => BooksExport::normalizeColumns($columns),
                     'headings' => BooksExport::availableColumns(),
                 ]);
                 Storage::disk('local')->put($resultPath, $pdf->output());
+                
             } else {
-                $writerType = $format === 'csv' ? ExcelWriter::CSV : ExcelWriter::XLSX;
-                Excel::store(new BooksExport($filters, $columns), $resultPath, 'local', $writerType);
+                // XLSX Fallback
+                $writerType = ExcelWriter::XLSX;
+                Excel::store($export, $resultPath, 'local', $writerType);
             }
-
-            $transfer->update([
-                'progress_percentage' => 90,
-            ]);
 
             $transfer->update([
                 'status' => 'completed',
@@ -86,21 +124,20 @@ class ProcessBooksExportJob implements ShouldQueue
                 'progress_percentage' => 100,
             ]);
 
-            $rowsExported = (int) (new BooksExport($filters, $columns))->query()->count();
-
             $exportLog?->update([
                 'status' => 'completed',
                 'download_link' => route('admin.books.export.download', $transfer),
-                'rows_exported' => $rowsExported,
+                'rows_exported' => $totalRows,
             ]);
 
             AuditLogger::log(
                 action: 'transfer.export.completed',
                 auditable: $transfer,
-                newValues: ['result_path' => $resultPath],
-                description: 'Queued books export completed.',
+                newValues: ['result_path' => $resultPath, 'rows' => $totalRows],
+                description: "Queued books export completed ({$totalRows} rows).",
                 userId: $transfer->user_id
             );
+
         } catch (\Throwable $e) {
             $transfer->update([
                 'status' => 'failed',

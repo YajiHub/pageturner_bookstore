@@ -16,13 +16,14 @@ use Maatwebsite\Excel\Validators\Failure;
 
 class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHeadingRow, WithValidation, SkipsOnFailure, SkipsEmptyRows
 {
-    /**
-     * @var array<int, array{row:int, attribute:string, errors:array<int, string>}>
-     */
     protected array $failedRows = [];
     protected int $processedRows = 0;
     protected int $lastSyncedRows = 0;
     protected array $failedRowMap = [];
+    
+    // In-memory caching dictionaries to prevent massive DB query loops
+    protected array $categoryMap = [];
+    protected array $categoryIdMap = [];
 
     public function __construct(
         private string $duplicateStrategy = 'skip',
@@ -30,6 +31,11 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
         private int $totalRows = 0
     )
     {
+        $this->categoryMap = Category::pluck('id', 'name')
+            ->mapWithKeys(fn($id, $name) => [mb_strtolower(trim($name)) => $id])
+            ->toArray();
+            
+        $this->categoryIdMap = Category::pluck('id', 'id')->toArray();
     }
 
     public function onFailure(Failure ...$failures): void
@@ -40,33 +46,22 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
                 'attribute' => $failure->attribute(),
                 'errors' => $failure->errors(),
             ];
-
             $this->failedRowMap[(int) $failure->row()] = true;
         }
-
         $this->syncProgress(true);
     }
 
-    /**
-     * @return array<int, array{row:int, attribute:string, errors:array<int, string>}>
-     */
     public function getFailedRows(): array
     {
         return $this->failedRows;
     }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Model|null
-     */
     public function model(array $row)
     {
         $this->processedRows++;
 
-        // Force isbn to string and normalize separators.
         $isbn = $row['isbn'] ?? '';
-        if (is_numeric($isbn)) {
-            $isbn = number_format((float) $isbn, 0, '.', '');
-        }
+        if (is_numeric($isbn)) { $isbn = number_format((float) $isbn, 0, '.', ''); }
         $isbn = $this->normalizeIsbn((string) $isbn);
 
         $categoryId = $this->resolveCategoryId($row);
@@ -86,25 +81,17 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
         if ($existing) {
             if ($this->duplicateStrategy === 'update') {
                 $existing->fill($payload);
-
                 $this->syncProgress();
-
                 return $existing;
             }
-
             $this->syncProgress();
-
             return null;
         }
 
         $this->syncProgress();
-
         return new Book($payload);
     }
 
-    /**
-     * Define validation rules for rows.
-     */
     public function rules(): array
     {
         return [
@@ -127,17 +114,11 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
         ];
     }
 
-    /**
-     * Read the file in chunks of 500 records.
-     */
     public function chunkSize(): int
     {
         return 1000;
     }
 
-    /**
-     * Insert records in databases in batches of 500 records.
-     */
     public function batchSize(): int
     {
         return 1000;
@@ -145,15 +126,15 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
 
     private function resolveCategoryId(array $row): int
     {
-        if (! empty($row['category_id']) && Category::whereKey($row['category_id'])->exists()) {
+        if (! empty($row['category_id']) && isset($this->categoryIdMap[(int)$row['category_id']])) {
             return (int) $row['category_id'];
         }
 
         $categoryName = $row['category'] ?? $row['category_name'] ?? null;
         if (is_string($categoryName) && trim($categoryName) !== '') {
-            $category = Category::whereRaw('LOWER(name) = ?', [mb_strtolower(trim($categoryName))])->first();
-            if ($category) {
-                return (int) $category->id;
+            $catKey = mb_strtolower(trim($categoryName));
+            if (isset($this->categoryMap[$catKey])) {
+                return $this->categoryMap[$catKey];
             }
         }
 
@@ -167,13 +148,8 @@ class BooksImport implements ToModel, WithBatchInserts, WithChunkReading, WithHe
 
     private function syncProgress(bool $force = false): void
     {
-        if (! $this->dataTransferJobId) {
-            return;
-        }
-
-        if (! $force && ($this->processedRows - $this->lastSyncedRows) < 200) {
-            return;
-        }
+        if (! $this->dataTransferJobId) return;
+        if (! $force && ($this->processedRows - $this->lastSyncedRows) < 200) return;
 
         $failedRows = count($this->failedRowMap);
         $successfulRows = max(0, $this->processedRows - $failedRows);

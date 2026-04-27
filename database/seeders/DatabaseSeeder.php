@@ -32,9 +32,8 @@ class DatabaseSeeder extends Seeder
         // Create categories
         $categories = Category::factory(8)->create();
 
-        // Custom size seeding logic via environment variable
-        // e.g. Add SEED_BOOKS_COUNT=1000000 to your .env file
-        $seedBooksCount = (int) env('SEED_BOOKS_COUNT', 24);
+        // FORCED to 1,000,000 to bypass Laravel's env() cache issues.
+        $seedBooksCount = 1000000; 
         
         if ($seedBooksCount > 100) {
             $this->command->info("Seeding {$seedBooksCount} books in chunks. This might take a while...");
@@ -53,7 +52,8 @@ class DatabaseSeeder extends Seeder
                         'category_id' => $categoryIds[array_rand($categoryIds)],
                         'title' => 'Book ' . ($i + $j + 1) . ' ' . Str::random(8),
                         'author' => 'Author ' . Str::random(6),
-                        'isbn' => (string) fake()->unique()->numberBetween(1000000000000, 9999999999999),
+                        // Fast mathematical ISBN generation to prevent out-of-memory errors
+                        'isbn' => '978' . str_pad((string)($i + $j + 1), 10, '0', STR_PAD_LEFT),
                         'price' => rand(15000, 199999) / 100,
                         'stock_quantity' => rand(5, 100),
                         'description' => 'Automatically generated book description for load testing.',

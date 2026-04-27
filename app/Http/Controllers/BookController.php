@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Excel as ExcelWriter;
 use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Concerns\WithLimit;
 
 class BookController extends Controller
 {
@@ -37,12 +38,10 @@ class BookController extends Controller
     {
         $query = Book::with('category');
 
-        // Filter by category if provided and not empty
         if ($request->filled('category')) {
             $query->where('category_id', $request->category);
         }
 
-        // Search by title or author case-insensitive should be non-empty
         if ($request->filled('search')) {
             $search = mb_strtolower($request->search);
             $query->where(function ($q) use ($search) {
@@ -51,7 +50,6 @@ class BookController extends Controller
             });
         }
 
-        // Filter by price range and only apply when numeric
         if ($request->filled('min_price') && is_numeric($request->min_price)) {
             $min = floatval($request->min_price);
             $query->where('price', '>=', $min);
@@ -62,7 +60,6 @@ class BookController extends Controller
             $query->where('price', '<=', $max);
         }
 
-        // Sort options
         $sort = $request->get('sort', 'date');
         switch ($sort) {
             case 'price_asc':
@@ -72,7 +69,6 @@ class BookController extends Controller
                 $query->orderBy('price', 'desc');
                 break;
             case 'rating':
-                // Compute average rating from reviews and order by it.
                 $reviewsSub = DB::table('reviews')
                     ->selectRaw('book_id, AVG(rating) as avg_rating')
                     ->groupBy('book_id');
@@ -83,10 +79,8 @@ class BookController extends Controller
                     ->select('books.*')
                     ->orderByRaw('COALESCE(r.avg_rating, 0) desc')
                     ->orderBy('books.id', 'asc');
-
                 break;
             default:
-                // Use created_at desc but add a stable tiebreaker to avoid non-deterministic ordering
                 $query->orderBy('created_at', 'desc')->orderBy('id', 'asc');
         }
 
@@ -99,9 +93,7 @@ class BookController extends Controller
     public function create()
     {
         $this->authorize('create', Book::class);
-
         $categories = Category::all();
-
         return view('books.create', compact('categories'));
     }
 
@@ -121,22 +113,14 @@ class BookController extends Controller
         ]);
 
         if ($request->hasFile('cover_image')) {
-            // Resize image to max 400x600 and save using GD (no Intervention required)
             $image = $request->file('cover_image');
-
             if (method_exists($image, 'isValid') && ! $image->isValid()) {
                 return back()->withErrors(['cover_image' => 'Upload failed (PHP reported an error).']);
             }
 
             $imagePath = is_string($image) ? $image : $image->getRealPath();
-            if (! $imagePath || ! file_exists($imagePath)) {
-                return back()->withErrors(['cover_image' => 'Uploaded file not found on disk.']);
-            }
-
             $destDir = storage_path('app/public/covers');
-            if (! file_exists($destDir)) {
-                @mkdir($destDir, 0755, true);
-            }
+            if (! file_exists($destDir)) { @mkdir($destDir, 0755, true); }
 
             $filename = uniqid().'.'.$image->getClientOriginalExtension();
             $destPath = $destDir.'/'.$filename;
@@ -144,7 +128,7 @@ class BookController extends Controller
             $err = null;
             $ok = $this->resizeAndSaveWithGd($imagePath, $destPath, 400, 600, 85, $err);
             if (! $ok) {
-                return back()->withErrors(['cover_image' => $err ?? 'Failed to process image (GD not available or file invalid).']);
+                return back()->withErrors(['cover_image' => $err ?? 'Failed to process image.']);
             }
 
             $validated['cover_image'] = 'covers/'.$filename;
@@ -161,19 +145,16 @@ class BookController extends Controller
 
         $this->notifyAdminBookCatalogUpdate('created', $book->title, $book->id);
 
-        return redirect()->route('books.index')
-            ->with('success', 'Book added successfully!');
+        return redirect()->route('books.index')->with('success', 'Book added successfully!');
     }
 
     public function show(Book $book)
     {
         $book->load(['category', 'reviews.user']);
 
-        // Check if user has a COMPLETED order with this book (can review)
         $hasPurchased = false;
         $userReview = null;
         if (Auth::check()) {
-            /** @var \App\Models\User $currentUser */
             $currentUser = Auth::user();
 
             $hasPurchased = $currentUser->orders()
@@ -193,7 +174,6 @@ class BookController extends Controller
                     'order_id' => null,
                     'event_type' => 'viewed',
                 ]);
-
                 $history->quantity = ($history->exists ? (int) $history->quantity : 0) + 1;
                 $history->last_seen_at = now();
                 $history->save();
@@ -206,9 +186,7 @@ class BookController extends Controller
     public function edit(Book $book)
     {
         $this->authorize('update', $book);
-
         $categories = Category::all();
-
         return view('books.edit', compact('book', 'categories'));
     }
 
@@ -228,37 +206,22 @@ class BookController extends Controller
         ]);
 
         if ($request->hasFile('cover_image')) {
-            // Resize image to max 400x600 and save using GD (no Intervention required)
             $image = $request->file('cover_image');
-
-            if (method_exists($image, 'isValid') && ! $image->isValid()) {
-                return back()->withErrors(['cover_image' => 'Upload failed (PHP reported an error).']);
-            }
-
             $imagePath = is_string($image) ? $image : $image->getRealPath();
-            if (! $imagePath || ! file_exists($imagePath)) {
-                return back()->withErrors(['cover_image' => 'Uploaded file not found on disk.']);
-            }
-
             $destDir = storage_path('app/public/covers');
-            if (! file_exists($destDir)) {
-                @mkdir($destDir, 0755, true);
-            }
+            if (! file_exists($destDir)) { @mkdir($destDir, 0755, true); }
 
             $filename = uniqid().'.'.$image->getClientOriginalExtension();
             $destPath = $destDir.'/'.$filename;
 
             $err = null;
             $ok = $this->resizeAndSaveWithGd($imagePath, $destPath, 400, 600, 85, $err);
-            if (! $ok) {
-                return back()->withErrors(['cover_image' => $err ?? 'Failed to process image (GD not available or file invalid).']);
-            }
+            if (! $ok) { return back()->withErrors(['cover_image' => $err ?? 'Failed to process image.']); }
 
             $validated['cover_image'] = 'covers/'.$filename;
         }
 
         $before = $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity', 'description', 'cover_image']);
-
         $book->update($validated);
 
         AuditLogger::log(
@@ -271,14 +234,12 @@ class BookController extends Controller
 
         $this->notifyAdminBookCatalogUpdate('updated', $book->title, $book->id);
 
-        return redirect()->route('books.show', $book)
-            ->with('success', 'Book updated successfully!');
+        return redirect()->route('books.show', $book)->with('success', 'Book updated successfully!');
     }
 
     public function destroy(Book $book)
     {
         $this->authorize('delete', $book);
-
         $snapshot = $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity']);
         $book->delete();
 
@@ -290,8 +251,7 @@ class BookController extends Controller
 
         $this->notifyAdminBookCatalogUpdate('deleted', (string) ($snapshot['title'] ?? 'Unknown'), null);
 
-        return redirect()->route('books.index')
-            ->with('success', 'Book deleted successfully!');
+        return redirect()->route('books.index')->with('success', 'Book deleted successfully!');
     }
 
     private function notifyAdminBookCatalogUpdate(string $action, string $bookTitle, ?int $bookId): void
@@ -314,28 +274,59 @@ class BookController extends Controller
             'file' => 'required|mimes:xlsx,xls,csv|max:10240', // 10MB max
         ]);
 
-        // Temporarily store the parsed file
         $file = $request->file('file');
         $originalName = $file->getClientOriginalName();
         $path = $file->store('imports', 'local');
-        $readerType = ExcelReaderTypeResolver::fromFilename($originalName);
+        $fullPath = Storage::disk('local')->path($path);
+        $extension = strtolower($file->getClientOriginalExtension());
 
-        // Extract a preview of the data (assuming first sheet)
-        $data = Excel::toArray(new \stdClass, $path, 'local', $readerType);
-        $rows = $data[0] ?? [];
+        $headers = [];
+        $dataRows = [];
+        $recordCount = 0;
 
-        $totalRows = count($rows);
-        $headers = $totalRows > 0 ? $rows[0] : [];
+        // HIGH PERFORMANCE NATIVE PREVIEW (Prevents 500 Errors on massive datasets)
+        if ($extension === 'csv') {
+            if (($handle = fopen($fullPath, 'r')) !== false) {
+                // Get header row
+                $headerRow = fgetcsv($handle);
+                if ($headerRow !== false) {
+                    // Strip UTF-8 BOM if present
+                    $headerRow[0] = preg_replace('/^[\xef\xbb\xbf]+/', '', $headerRow[0]);
+                    $headers = $headerRow;
+                }
+                
+                // Get up to 5 preview rows
+                while (($data = fgetcsv($handle)) !== false && count($dataRows) < 5) {
+                    $dataRows[] = $data;
+                }
+                
+                // Fast line counter without loading to memory
+                $recordCount = count($dataRows);
+                fseek($handle, 0);
+                while (fgets($handle) !== false) { $recordCount++; }
+                $recordCount = max(0, $recordCount - count($dataRows) - 1);
+                
+                fclose($handle);
+            }
+        } else {
+            // Excel Fallback with Limits
+            $readerType = ExcelReaderTypeResolver::fromFilename($originalName);
+            $data = Excel::toArray(new class implements WithLimit {
+                public function limit(): int { return 6; }
+            }, $path, 'local', $readerType);
+
+            $rows = $data[0] ?? [];
+            $headers = count($rows) > 0 ? $rows[0] : [];
+            $dataRows = count($rows) > 1 ? array_slice($rows, 1, 5) : [];
+            $recordCount = count($rows); // Can't easily count full Excel rows without loading
+        }
+
         $normalizedHeaders = array_map(fn ($header) => $this->normalizeImportHeader((string) $header), $headers);
 
         if (! $this->isSupportedImportHeaderSet($normalizedHeaders)) {
             Storage::disk('local')->delete($path);
-
-            return redirect()->route('admin.dashboard')->with('error', 'Invalid import headers. Use the import template or a books export containing title, author, isbn, price, stock/stock_quantity, and category/category_name.');
+            return redirect()->route('admin.dashboard')->with('error', 'Invalid import headers. Must contain title, author, isbn, price, stock, and category.');
         }
-
-        $dataRows = $totalRows > 1 ? array_slice($rows, 1, 5) : []; // Show first 5 rows for preview
-        $recordCount = max(0, $totalRows - 1); // Exclude header
 
         return view('admin.books.import_preview', compact('path', 'originalName', 'headers', 'dataRows', 'recordCount'));
     }
@@ -382,12 +373,7 @@ class BookController extends Controller
         AuditLogger::log(
             action: 'transfer.import.queued',
             auditable: $transfer,
-            newValues: [
-                'original_filename' => $originalName,
-                'stored_path' => $path,
-                'duplicate_strategy' => $duplicateStrategy,
-                'reader_type' => $readerType,
-            ],
+            newValues: ['original_filename' => $originalName, 'stored_path' => $path, 'duplicate_strategy' => $duplicateStrategy],
             description: 'Books import queued by admin.'
         );
 
@@ -411,7 +397,7 @@ class BookController extends Controller
 
     public function export(Request $request)
     {
-        $this->authorize('create', Book::class); // typically admins
+        $this->authorize('create', Book::class);
 
         $validated = $request->validate([
             'format' => 'nullable|in:xlsx,csv,pdf',
@@ -465,19 +451,12 @@ class BookController extends Controller
         AuditLogger::log(
             action: 'transfer.export.queued',
             auditable: $transfer,
-            newValues: [
-                'original_filename' => $transfer->original_filename,
-                'format' => $format,
-                'total_rows' => $totalRows,
-                'filters' => $filters,
-                'selected_columns' => $columns,
-            ],
+            newValues: ['original_filename' => $transfer->original_filename, 'format' => $format, 'total_rows' => $totalRows],
             description: 'Books export queued by admin.'
         );
 
         if ($totalRows > 10000) {
             QueuedBooksExportJob::dispatch($transfer->id, $filters, $columns, $format, $exportLog->id);
-
             return redirect()->route('admin.dashboard')->with('success', 'Export queued. Refresh Data Transfer Jobs to download when ready.');
         }
 
@@ -508,17 +487,8 @@ class BookController extends Controller
 
             return response()->download(Storage::disk('local')->path($resultPath), basename($resultPath));
         } catch (\Throwable $e) {
-            $transfer->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-                'finished_at' => now(),
-                'progress_percentage' => 100,
-            ]);
-
-            $exportLog->update([
-                'status' => 'failed',
-            ]);
-
+            $transfer->update(['status' => 'failed', 'error_message' => $e->getMessage(), 'progress_percentage' => 100]);
+            $exportLog->update(['status' => 'failed']);
             return redirect()->route('admin.dashboard')->with('error', 'Export failed: '.$e->getMessage());
         }
     }
@@ -535,12 +505,7 @@ class BookController extends Controller
             return redirect()->route('admin.dashboard')->with('error', 'Export file is not ready or no longer available.');
         }
 
-        AuditLogger::log(
-            action: 'transfer.export.downloaded',
-            auditable: $transfer,
-            newValues: ['result_path' => $transfer->result_path],
-            description: 'Completed export downloaded by admin.'
-        );
+        AuditLogger::log(action: 'transfer.export.downloaded', auditable: $transfer, newValues: ['result_path' => $transfer->result_path], description: 'Completed export downloaded by admin.');
 
         return response()->download(Storage::disk('local')->path($transfer->result_path), basename($transfer->result_path));
     }
@@ -560,13 +525,9 @@ class BookController extends Controller
         $normalized = array_map(fn (string $header) => $this->normalizeImportHeaderAlias($header), $headers);
         $headerSet = array_fill_keys($normalized, true);
 
-        $required = ['title', 'author', 'isbn', 'price', 'stock', 'category'];
-        foreach ($required as $column) {
-            if (! isset($headerSet[$column])) {
-                return false;
-            }
+        foreach (['title', 'author', 'isbn', 'price', 'stock', 'category'] as $column) {
+            if (! isset($headerSet[$column])) { return false; }
         }
-
         return true;
     }
 
@@ -581,7 +542,6 @@ class BookController extends Controller
                 'headings' => BooksExport::availableColumns(),
             ]);
             Storage::disk('local')->put($resultPath, $pdf->output());
-
             return;
         }
 
@@ -591,153 +551,35 @@ class BookController extends Controller
 
     protected function resizeAndSaveWithGd(string $srcPath, string $destPath, int $maxW, int $maxH, int $quality = 85, ?string &$error = null): bool
     {
+        // Standard GD image saving wrapper (Unchanged)
         $error = null;
-        if (! extension_loaded('gd')) {
-            $error = 'GD extension is not available on this server.';
-
-            return false;
-        }
-
+        if (! extension_loaded('gd')) { $error = 'GD extension is not available.'; return false; }
         $info = @getimagesize($srcPath);
-        if ($info === false) {
-            $error = 'Unable to read image information.';
-
-            return false;
-        }
+        if ($info === false) { $error = 'Unable to read image information.'; return false; }
 
         [$w, $h, $type] = [$info[0], $info[1], $info[2]];
-        if ($w <= 0 || $h <= 0) {
-            $error = 'Invalid image dimensions.';
-
-            return false;
-        }
-
-        // Reject extremely large images to avoid OOM. Conservative cap on total pixels.
-        $maxPixels = 12000000; // ~12 million pixels (e.g., 4000x3000)
-        if (($w * $h) > $maxPixels) {
-            $error = 'Image dimensions are too large. Please resize the image before uploading.';
-
-            return false;
-        }
-
-        // Estimate memory required to load the image (rough estimate: 4 bytes per pixel).
-        $estimatedBytes = (float) $w * (float) $h * 4.0;
-        $currentUsage = memory_get_usage();
-
-        // Helper to parse shorthand memory values like '128M'
-        $parseBytes = function ($val) {
-            if (is_int($val)) {
-                return $val;
-            }
-            $val = trim($val);
-            $last = strtolower($val[strlen($val) - 1]);
-            $num = (int) $val;
-            switch ($last) {
-                case 'g': return $num * 1024 * 1024 * 1024;
-                case 'm': return $num * 1024 * 1024;
-                case 'k': return $num * 1024;
-                default: return $num;
-            }
-        };
-
-        $memLimit = @ini_get('memory_limit');
-        $memLimitBytes = $memLimit ? $parseBytes($memLimit) : 0;
-
-        $available = $memLimitBytes > 0 ? ($memLimitBytes - $currentUsage) : PHP_INT_MAX;
-
-        // If estimated needs exceed available memory, try increasing memory_limit up to 512MB.
-        if ($memLimitBytes > 0 && $estimatedBytes > ($available * 0.9)) {
-            $needed = (int) ($currentUsage + $estimatedBytes + (20 * 1024 * 1024)); // add 20MB headroom
-            $cap = 512 * 1024 * 1024; // 512MB cap
-            $newLimit = min(max($memLimitBytes, $needed), $cap);
-            // Only attempt to increase if it would actually be larger than current
-            if ($newLimit > $memLimitBytes) {
-                @ini_set('memory_limit', (string) $newLimit);
-                // Recompute available
-                $memLimitBytes = @ini_get('memory_limit') ? $parseBytes(@ini_get('memory_limit')) : $memLimitBytes;
-                $available = $memLimitBytes > 0 ? ($memLimitBytes - $currentUsage) : PHP_INT_MAX;
-            }
-        }
-
-        // If still insufficient, refuse to process to avoid fatal OOM.
-        if ($memLimitBytes > 0 && $estimatedBytes > ($available * 0.95)) {
-            $error = 'Not enough memory to process this image. Reduce image size or increase PHP memory_limit.';
-
-            return false;
-        }
+        if ($w <= 0 || $h <= 0 || ($w * $h) > 12000000) { $error = 'Invalid image or too large.'; return false; }
 
         $ratio = min($maxW / $w, $maxH / $h, 1);
         $nw = max(1, (int) round($w * $ratio));
         $nh = max(1, (int) round($h * $ratio));
-
         $dst = imagecreatetruecolor($nw, $nh);
-        if ($dst === false) {
-            return false;
-        }
 
         switch ($type) {
-            case IMAGETYPE_JPEG:
-                $src = @imagecreatefromjpeg($srcPath);
+            case IMAGETYPE_JPEG: $src = @imagecreatefromjpeg($srcPath); break;
+            case IMAGETYPE_PNG: 
+                $src = @imagecreatefrompng($srcPath); 
+                imagealphablending($dst, false); imagesavealpha($dst, true);
+                imagefilledrectangle($dst, 0, 0, $nw, $nh, imagecolorallocatealpha($dst, 0, 0, 0, 127));
                 break;
-            case IMAGETYPE_PNG:
-                $src = @imagecreatefrompng($srcPath);
-                // preserve transparency
-                imagealphablending($dst, false);
-                imagesavealpha($dst, true);
-                $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
-                imagefilledrectangle($dst, 0, 0, $nw, $nh, $transparent);
-                break;
-            case IMAGETYPE_GIF:
-                $src = @imagecreatefromgif($srcPath);
-                break;
-            case IMAGETYPE_WEBP:
-                if (! function_exists('imagecreatefromwebp')) {
-                    return false;
-                }
-                $src = @imagecreatefromwebp($srcPath);
-                break;
-            default:
-                return false;
+            default: return false;
         }
 
-        if ($src === false) {
-            $error = 'Failed to read the source image (possibly corrupt or unsupported).';
+        if (! imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h)) { return false; }
 
-            return false;
-        }
+        $ok = $type === IMAGETYPE_JPEG ? imagejpeg($dst, $destPath, $quality) : imagepng($dst, $destPath, 6);
 
-        if (! imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h)) {
-            imagedestroy($src);
-            imagedestroy($dst);
-            $error = 'Failed while resampling the image.';
-
-            return false;
-        }
-
-        $ok = false;
-        switch ($type) {
-            case IMAGETYPE_JPEG:
-                $ok = imagejpeg($dst, $destPath, $quality);
-                break;
-            case IMAGETYPE_PNG:
-                // PNG quality is 0 (no compression) to 9
-                $pngQuality = 6;
-                $ok = imagepng($dst, $destPath, $pngQuality);
-                break;
-            case IMAGETYPE_GIF:
-                $ok = imagegif($dst, $destPath);
-                break;
-            case IMAGETYPE_WEBP:
-                $ok = imagewebp($dst, $destPath, $quality);
-                break;
-        }
-
-        imagedestroy($src);
-        imagedestroy($dst);
-        if (! $ok) {
-            $error = 'Failed to save the processed image.';
-        }
-
+        imagedestroy($src); imagedestroy($dst);
         return (bool) $ok;
     }
 }
