@@ -89,7 +89,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actor</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actor & Source</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
@@ -109,6 +109,12 @@
                                 @if($log->user?->email)
                                     <div class="text-xs text-gray-500">{{ $log->user->email }}</div>
                                 @endif
+                                <div class="mt-2 text-xs text-indigo-600 font-mono" title="IP Address">
+                                    IP: {{ $log->ip_address ?? 'N/A' }}
+                                </div>
+                                <div class="text-[10px] text-gray-400 truncate max-w-[150px]" title="{{ $log->user_agent }}">
+                                    Dev: {{ \Illuminate\Support\Str::limit($log->user_agent ?? 'Unknown Device', 25) }}
+                                </div>
                             </td>
                             <td class="px-4 py-3 text-sm">
                                 <span class="inline-flex px-2 py-1 text-xs rounded bg-indigo-50 text-indigo-700 font-medium">{{ $log->action }}</span>

@@ -28,6 +28,7 @@
             <div><span class="font-semibold text-gray-700">Method:</span> {{ $auditLog->request_method ?? '-' }}</div>
             <div><span class="font-semibold text-gray-700">IP Address:</span> {{ $auditLog->ip_address ?? '-' }}</div>
             <div><span class="font-semibold text-gray-700">Correlation ID:</span> <span class="font-mono break-all">{{ $auditLog->correlation_id ?? '-' }}</span></div>
+            <div class="md:col-span-2"><span class="font-semibold text-gray-700">User Agent (Device):</span> <span class="break-all">{{ $auditLog->user_agent ?? '-' }}</span></div>
             <div><span class="font-semibold text-gray-700">Request ID:</span> <span class="font-mono break-all">{{ $auditLog->request_id ?? '-' }}</span></div>
             <div><span class="font-semibold text-gray-700">Session ID:</span> <span class="font-mono break-all">{{ $auditLog->session_id ?? '-' }}</span></div>
             <div class="md:col-span-2"><span class="font-semibold text-gray-700">Request URL:</span> <span class="break-all">{{ $auditLog->request_url ?? '-' }}</span></div>
