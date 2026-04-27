@@ -90,7 +90,7 @@ return [
              * For a complete list of available customization options, see https://github.com/spatie/db-dumper
              */
             'databases' => [
-                env('DB_CONNECTION', 'mysql'),
+                env('DB_CONNECTION', 'pgsql'),
             ],
         ],
 
@@ -182,7 +182,7 @@ return [
          * The password to be used for archive encryption.
          * Set to `null` to disable encryption.
          */
-        'password' => env('BACKUP_ARCHIVE_PASSWORD'),
+        'password' => null,
 
         /*
          * The encryption algorithm to be used for archive encryption.
@@ -192,7 +192,7 @@ return [
          *
          * When set to 'default', we'll use AES-256 if available on your system.
          */
-        'encryption' => 'default',
+        'encryption' => 'none',
 
         /*
          * After creating the zip, verify it can be opened and contains files.
@@ -236,11 +236,10 @@ return [
         'notifiable' => Notifiable::class,
 
         'mail' => [
-            'to' => env('BACKUP_NOTIFICATION_EMAIL', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
-
+            'to' => env('BACKUP_NOTIFICATION_EMAIL', 's.montecillo.jopurjayii@cmu.edu.ph'),
             'from' => [
-                'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-                'name' => env('MAIL_FROM_NAME', 'Example'),
+                'address' => env('MAIL_FROM_ADDRESS', 's.montecillo.jopurjayii@cmu.edu.ph'),
+                'name' => env('MAIL_FROM_NAME', 'PageTurner Bookstore'),
             ],
         ],
 
