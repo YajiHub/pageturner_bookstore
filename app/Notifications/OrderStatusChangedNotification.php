@@ -11,9 +11,7 @@ class OrderStatusChangedNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public Order $order, public string $oldStatus, public string $newStatus)
-    {
-    }
+    public function __construct(public Order $order, public string $oldStatus, public string $newStatus) {}
 
     public function via(object $notifiable): array
     {
@@ -23,12 +21,12 @@ class OrderStatusChangedNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Order #' . $this->order->id . ' Status Updated')
-            ->greeting('Hello ' . $notifiable->name . '!')
-            ->line('Your order #' . $this->order->id . ' status has been updated.')
-            ->line('Previous Status: ' . ucfirst($this->oldStatus))
-            ->line('New Status: ' . ucfirst($this->newStatus))
-            ->action('View Order', url('/orders/' . $this->order->id))
+            ->subject('Order #'.$this->order->id.' Status Updated')
+            ->greeting('Hello '.$notifiable->name.'!')
+            ->line('Your order #'.$this->order->id.' status has been updated.')
+            ->line('Previous Status: '.ucfirst($this->oldStatus))
+            ->line('New Status: '.ucfirst($this->newStatus))
+            ->action('View Order', url('/orders/'.$this->order->id))
             ->line('Thank you for shopping with PageTurner Bookstore!');
     }
 
@@ -36,7 +34,7 @@ class OrderStatusChangedNotification extends Notification
     {
         return [
             'order_id' => $this->order->id,
-            'message' => 'Order #' . $this->order->id . ' status changed from ' . ucfirst($this->oldStatus) . ' to ' . ucfirst($this->newStatus),
+            'message' => 'Order #'.$this->order->id.' status changed from '.ucfirst($this->oldStatus).' to '.ucfirst($this->newStatus),
             'old_status' => $this->oldStatus,
             'new_status' => $this->newStatus,
         ];

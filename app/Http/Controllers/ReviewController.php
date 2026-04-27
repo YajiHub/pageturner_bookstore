@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Models\User;
 use App\Notifications\NewReviewAdminNotification;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Throwable;
 
@@ -29,11 +30,28 @@ class ReviewController extends Controller
             ->first();
 
         if ($existingReview) {
+            $before = $existingReview->only(['rating', 'comment']);
             $existingReview->update($validated);
+
+            AuditLogger::log(
+                action: 'review.updated',
+                auditable: $existingReview,
+                oldValues: $before,
+                newValues: $existingReview->only(['rating', 'comment', 'book_id', 'user_id']),
+                description: 'Customer updated a review.'
+            );
+
             $message = 'Review updated successfully!';
         } else {
             $review = Review::create($validated);
             $message = 'Review submitted successfully!';
+
+            AuditLogger::log(
+                action: 'review.created',
+                auditable: $review,
+                newValues: $review->only(['rating', 'comment', 'book_id', 'user_id']),
+                description: 'Customer submitted a new review.'
+            );
 
             // Notify admins about the new review (non-blocking)
             try {
@@ -56,7 +74,14 @@ class ReviewController extends Controller
         $this->authorize('delete', $review);
 
         $book = $review->book;
+        $snapshot = $review->only(['id', 'user_id', 'book_id', 'rating', 'comment']);
         $review->delete();
+
+        AuditLogger::log(
+            action: 'review.deleted',
+            oldValues: $snapshot,
+            description: 'Review deleted by owner/admin.'
+        );
 
         return redirect()->route('books.show', $book)
             ->with('success', 'Review deleted successfully!');

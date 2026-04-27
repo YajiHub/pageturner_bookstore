@@ -21,12 +21,15 @@ class PasswordController extends Controller
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
+        $currentPassword = $validated['current_password'];
+
+        // Log out other sessions/devices before changing the password,
+        // while the current password still matches the stored hash.
+        Auth::logoutOtherDevices($currentPassword);
+
         $request->user()->update([
             'password' => Hash::make($validated['password']),
         ]);
-
-        // Log out other sessions/devices for security
-        Auth::logoutOtherDevices($validated['current_password']);
 
         return back()->with('status', 'password-updated');
     }

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Book;
 use App\Models\Category;
 
@@ -10,24 +9,30 @@ class HomeController extends Controller
 {
     public function index()
     {
-        // Select featured books by two signals:
-        // 1) Highest average rating (only books with at least one review)
-        // 2) Most number of reviews
-        $booksWithReviews = Book::with('category')->withCount('reviews')->withAvg('reviews', 'rating')->get();
+        // Select featured books using SQL ordering instead of loading every book
+        // into memory. This keeps the home page fast as the catalog grows.
+        $baseQuery = Book::with('category')
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating');
 
-        $topRated = $booksWithReviews->where('reviews_count', '>', 0)
-            ->sortByDesc('reviews_avg_rating')
-            ->sortByDesc('reviews_count')
-            ->take(4);
+        $topRated = (clone $baseQuery)
+            ->whereHas('reviews')
+            ->orderByDesc('reviews_avg_rating')
+            ->orderByDesc('reviews_count')
+            ->take(4)
+            ->get();
 
-        $mostReviewed = $booksWithReviews->sortByDesc('reviews_count')->take(4);
+        $mostReviewed = (clone $baseQuery)
+            ->orderByDesc('reviews_count')
+            ->take(4)
+            ->get();
 
-        // Merge unique and limit to 8
-        $featuredBooks = $topRated->merge($mostReviewed)->unique('id')->values()->take(8);
+        // Merge unique and limit to exactly 4 for optimal user focus
+        $featuredBooks = $topRated->merge($mostReviewed)->unique('id')->values()->take(4);
 
         $categories = Category::withCount('books')->get();
 
         return view('home', compact('featuredBooks', 'categories'));
-        
+
     }
 }

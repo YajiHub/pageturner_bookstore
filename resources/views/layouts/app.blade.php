@@ -15,8 +15,14 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 </head>
-<body class="font-sans antialiased bg-gray-100">
-    <div class="min-h-screen">
+<body class="font-sans antialiased bg-gray-50 relative min-h-screen flex flex-col">
+    <!-- Fixed Immersive Background -->
+    <div class="fixed inset-0 z-[-1]">
+        <img class="w-full h-full object-cover opacity-30" src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?q=80&w=2228&auto=format&fit=crop" alt="Library Background">
+        <div class="absolute inset-0 bg-gray-100/80 backdrop-blur-sm"></div>
+    </div>
+    
+    <div class="flex-grow flex flex-col">
         @include('partials.navigation')
 
         <!-- Page Heading -->
@@ -31,8 +37,11 @@
         <!-- Flash Messages -->
         @include('partials.flash-messages')
 
+        <!-- Page Hero (Edge to Edge) -->
+        @yield('hero')
+
         <!-- Page Content -->
-        <main class="py-6">
+        <main class="py-6 flex-grow">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 @yield('content')
             </div>

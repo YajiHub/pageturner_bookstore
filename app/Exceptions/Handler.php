@@ -33,7 +33,7 @@ class Handler extends ExceptionHandler
     {
         if ($exception instanceof PostTooLargeException) {
             return redirect()->back()->withErrors([
-                'cover_image' => 'The uploaded data is too large. Increase PHP upload_max_filesize/post_max_size or upload a smaller file.'
+                'cover_image' => 'The uploaded data is too large. Increase PHP upload_max_filesize/post_max_size or upload a smaller file.',
             ]);
         }
 

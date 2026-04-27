@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class Book extends Model
 {
     //
     use HasFactory;
+
     protected $fillable = [
         'category_id',
         'title',
@@ -25,7 +26,6 @@ class Book extends Model
         return $this->belongsTo(Category::class);
     }
 
-
     public function reviews()
     {
         return $this->hasMany(Review::class);
@@ -36,11 +36,14 @@ class Book extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function readingHistories()
+    {
+        return $this->hasMany(ReadingHistory::class);
+    }
+
     // Accessor for average rating
     public function getAverageRatingAttribute()
     {
         return $this->reviews()->avg('rating') ?? 0;
     }
-
-
 }

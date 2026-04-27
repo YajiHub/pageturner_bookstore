@@ -15,7 +15,7 @@ class ReviewPolicy
     public function create(User $user, Book $book): bool
     {
         // Must have verified email
-        if (!$user->hasVerifiedEmail()) {
+        if (! $user->hasVerifiedEmail()) {
             return false;
         }
 

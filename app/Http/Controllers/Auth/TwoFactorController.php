@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Notifications\TwoFactorCodeNotification;
-use App\Notifications\TwoFactorEnabledNotification;
 use App\Notifications\TwoFactorDisabledNotification;
+use App\Notifications\TwoFactorEnabledNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Throwable;
@@ -18,7 +18,7 @@ class TwoFactorController extends Controller
     public function show(Request $request)
     {
         // Only show if user passed 2FA-pending state
-        if (!$request->session()->has('2fa:user_id')) {
+        if (! $request->session()->has('2fa:user_id')) {
             return redirect()->route('login');
         }
 
@@ -35,7 +35,7 @@ class TwoFactorController extends Controller
         ]);
 
         $userId = $request->session()->get('2fa:user_id');
-        if (!$userId) {
+        if (! $userId) {
             return redirect()->route('login');
         }
 
@@ -55,6 +55,7 @@ class TwoFactorController extends Controller
             ]);
 
             $this->completeTwoFactorLogin($request, $user);
+
             return redirect()->intended($user->isAdmin() ? route('admin.dashboard') : route('dashboard'));
         }
 
@@ -64,6 +65,7 @@ class TwoFactorController extends Controller
         }
 
         $this->completeTwoFactorLogin($request, $user);
+
         return redirect()->intended($user->isAdmin() ? route('admin.dashboard') : route('dashboard'));
     }
 
@@ -73,7 +75,7 @@ class TwoFactorController extends Controller
     public function resend(Request $request)
     {
         $userId = $request->session()->get('2fa:user_id');
-        if (!$userId) {
+        if (! $userId) {
             return redirect()->route('login');
         }
 
@@ -116,7 +118,7 @@ class TwoFactorController extends Controller
         ]);
 
         try {
-            $user->notify(new TwoFactorEnabledNotification());
+            $user->notify(new TwoFactorEnabledNotification);
         } catch (Throwable $e) {
             report($e);
 
@@ -141,7 +143,7 @@ class TwoFactorController extends Controller
         ]);
 
         try {
-            $request->user()->notify(new TwoFactorDisabledNotification());
+            $request->user()->notify(new TwoFactorDisabledNotification);
         } catch (Throwable $e) {
             report($e);
 

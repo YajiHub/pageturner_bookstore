@@ -9,41 +9,80 @@
 
 # Pageturner Bookstore
 
-Pageturner Bookstore is a Laravel-based web application designed to manage an online bookstore. It includes features for managing books, categories, orders, and user reviews. The application uses a modern tech stack, including Laravel for the backend and Tailwind CSS for styling. It supports user authentication and provides an admin panel for managing the store's content. The project is structured to be easily set up and extended, with clear instructions for installation and configuration.
+Pageturner Bookstore is a Laravel 12 application for browsing books, placing orders, writing reviews, and administering store operations. The system includes customer and admin dashboards, data transfer tools, audit logging, scheduled maintenance, API optimization, and database performance tuning.
 
-## Setup Instructions
+## Overview
 
-1. **Extract the ZIP File**:
-   Extract the contents of `Montecillo_JopurJay_Lab3_Bookstore.zip` to your desired directory.
+The application is built around three primary experiences:
 
-2. **Install Dependencies**:
-   ```bash
-   composer install
-   npm install
-   ```
+- Customer storefront for book browsing, cart checkout, orders, reviews, and account management.
+- Admin workspace for catalog management, order handling, transfer jobs, audit logs, and operational monitoring.
+- Support utilities for import/export, backups, scheduled maintenance, API responses, and data portability.
 
-3. **Set Up Environment**:
-   Update the `.env` file with your database credentials.
+## Key Features
 
-4. **Run Migrations and Seeders**:
-   ```bash
-   php artisan migrate --seed
-   ```
+- Book, category, order, and review management.
+- Customer and admin dashboards.
+- Self-service data portability from the customer dashboard.
+- Import/export workflows for books, orders, and users.
+- Audit logging with integrity checks and export/archive tools.
+- Scheduled backup, cleanup, and maintenance tasks.
+- Optimized JSON API responses for book data.
+- Query performance indexes for the main transactional tables.
 
-5. **Start the Development Server**:
-   ```bash
-   php artisan serve
-   ```
+## Setup
 
-## Login Credentials for Test Accounts
+1. Install dependencies.
 
-- **Admin Account**:
-  - Email: `admin@pageturner.com`
-  - Password: `password`
+```bash
+composer install
+npm install
+```
 
-- **User Account**:
-  - `you can proceed by register to create a user account`
+2. Configure environment variables in `.env`.
 
-## Additional Notes
+3. Run migrations and seeders.
 
-- Ensure writable permissions for `storage/` and `bootstrap/cache/` directories.
+```bash
+php artisan migrate --seed
+```
+
+4. Start the app.
+
+```bash
+php artisan serve
+```
+
+## Default Access
+
+- Admin email: `admin@pageturner.com`
+- Admin password: `password`
+
+Customers can register from the sign-up page.
+
+## Important Runtime Commands
+
+```bash
+php artisan queue:work
+php artisan schedule:work
+```
+
+These keep queued imports/exports and scheduled maintenance running.
+
+## Main Routes
+
+- `/dashboard` customer dashboard
+- `/dashboard/export-data` personal data portability download
+- `/admin/dashboard` admin dashboard
+- `/books`, `/orders`, `/categories` storefront and account flows
+- `/api/books` optimized API endpoint
+
+## Documentation
+
+- `docs/LAB6_REQUIREMENTS_MATRIX.md` for requirement coverage
+- `docs/LAB6_RUNBOOK.md` for operational verification
+
+## Notes
+
+- Ensure `storage/` and `bootstrap/cache/` are writable.
+- Run the pending migrations before using the integrity/archive and indexing enhancements.

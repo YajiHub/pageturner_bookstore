@@ -66,8 +66,121 @@
         </div>
     </div>
 
-    <!-- Order Status Summary -->
+    <div class="bg-white rounded-lg shadow mb-6 border border-slate-200 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="rounded-lg px-3 py-2 border {{ $transferHealth['stalled_processing'] > 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200' }}">
+                <div class="text-xs uppercase tracking-wide {{ $transferHealth['stalled_processing'] > 0 ? 'text-red-600' : 'text-emerald-600' }}">Stalled Transfers</div>
+                <div class="text-xl font-semibold {{ $transferHealth['stalled_processing'] > 0 ? 'text-red-700' : 'text-emerald-700' }}">{{ number_format($transferHealth['stalled_processing']) }}</div>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {{ $transferHealth['failed'] > 0 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200' }}">
+                <div class="text-xs uppercase tracking-wide {{ $transferHealth['failed'] > 0 ? 'text-amber-700' : 'text-slate-500' }}">Failed Transfers</div>
+                <div class="text-xl font-semibold {{ $transferHealth['failed'] > 0 ? 'text-amber-700' : 'text-slate-700' }}">{{ number_format($transferHealth['failed']) }}</div>
+            </div>
+            <div class="rounded-lg px-3 py-2 border {{ $orderStatusSummary['pending'] > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200' }}">
+                <div class="text-xs uppercase tracking-wide {{ $orderStatusSummary['pending'] > 0 ? 'text-blue-700' : 'text-slate-500' }}">Pending Orders</div>
+                <div class="text-xl font-semibold {{ $orderStatusSummary['pending'] > 0 ? 'text-blue-700' : 'text-slate-700' }}">{{ number_format($orderStatusSummary['pending']) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticky top-20 z-30 mb-8">
+        <div class="bg-white/95 backdrop-blur border border-slate-200 rounded-lg shadow px-3 py-2 flex flex-wrap gap-2 text-xs sm:text-sm">
+            <a href="#overview-insights" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Overview</a>
+            <a href="#quick-actions" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Quick Actions</a>
+            <a href="#data-management" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Data Management</a>
+            <a href="#transfer-jobs" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Transfer Jobs</a>
+            <a href="#recent-audit" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Audit Logs</a>
+            <a href="#recent-orders" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Orders</a>
+            <a href="#recent-reviews" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Reviews</a>
+        </div>
+    </div>
+
+    <!-- Advanced Insights -->
+    <div id="overview-insights" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-28">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Sales Performance</h3>
+            <div class="space-y-3">
+                <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+                    <div class="text-sm text-emerald-700">Today</div>
+                    <div class="text-lg font-semibold text-emerald-900">₱{{ number_format($salesMetrics['today']['revenue'], 2) }}</div>
+                    <div class="text-xs text-emerald-700">{{ number_format($salesMetrics['today']['orders']) }} completed orders</div>
+                </div>
+                <div class="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div class="text-sm text-blue-700">Last 7 Days</div>
+                    <div class="text-lg font-semibold text-blue-900">₱{{ number_format($salesMetrics['last_7_days']['revenue'], 2) }}</div>
+                    <div class="text-xs text-blue-700">{{ number_format($salesMetrics['last_7_days']['orders']) }} completed orders</div>
+                </div>
+                <div class="p-3 rounded-lg bg-violet-50 border border-violet-100">
+                    <div class="text-sm text-violet-700">Last 30 Days</div>
+                    <div class="text-lg font-semibold text-violet-900">₱{{ number_format($salesMetrics['last_30_days']['revenue'], 2) }}</div>
+                    <div class="text-xs text-violet-700">{{ number_format($salesMetrics['last_30_days']['orders']) }} completed orders</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Transfer Queue Health</h3>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div class="text-xs text-gray-500">Queued</div>
+                    <div class="text-lg font-semibold text-gray-800">{{ number_format($transferHealth['queued']) }}</div>
+                </div>
+                <div class="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div class="text-xs text-blue-600">Processing</div>
+                    <div class="text-lg font-semibold text-blue-800">{{ number_format($transferHealth['processing']) }}</div>
+                </div>
+                <div class="p-3 rounded-lg bg-green-50 border border-green-100">
+                    <div class="text-xs text-green-600">Completed</div>
+                    <div class="text-lg font-semibold text-green-800">{{ number_format($transferHealth['completed']) }}</div>
+                </div>
+                <div class="p-3 rounded-lg bg-red-50 border border-red-100">
+                    <div class="text-xs text-red-600">Failed</div>
+                    <div class="text-lg font-semibold text-red-800">{{ number_format($transferHealth['failed']) }}</div>
+                </div>
+            </div>
+            <div class="text-sm {{ $transferHealth['stalled_processing'] > 0 ? 'text-red-700' : 'text-green-700' }}">
+                Stalled processing jobs (&gt;90m): <span class="font-semibold">{{ number_format($transferHealth['stalled_processing']) }}</span>
+            </div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Low Stock Alert (≤ {{ $lowStockThreshold }})</h3>
+            <div class="space-y-2">
+                @forelse($lowStockBooks as $book)
+                    <div class="flex items-center justify-between p-2 rounded bg-amber-50 border border-amber-100">
+                        <a href="{{ route('books.show', $book->id) }}" class="text-sm text-gray-800 hover:text-indigo-600">{{ $book->title }}</a>
+                        <span class="text-xs font-semibold px-2 py-1 rounded {{ $book->stock_quantity <= 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                            {{ $book->stock_quantity }} left
+                        </span>
+                    </div>
+                @empty
+                    <p class="text-sm text-gray-500">No low-stock books right now.</p>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Selling Books</h3>
+            <div class="space-y-2">
+                @forelse($topSellingBooks as $book)
+                    <div class="p-2 rounded bg-gray-50 border border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-800">{{ $book->title }}</span>
+                            <span class="text-xs text-gray-600">{{ number_format($book->total_units) }} units</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">Revenue: ₱{{ number_format((float) $book->total_revenue, 2) }}</div>
+                    </div>
+                @empty
+                    <p class="text-sm text-gray-500">No completed-order sales data yet.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Status Summary -->
+    <div id="quick-actions" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-28">
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Order Status Summary</h3>
             <div class="space-y-3">
@@ -143,12 +256,296 @@
                     </svg>
                     <span class="text-sm font-medium text-gray-700">Settings</span>
                 </a>
+                <a href="{{ route('admin.audit-logs.index') }}" class="flex items-center p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
+                    <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-amber-700">Audit Logs</span>
+                </a>
             </div>
         </div>
     </div>
 
+    <!-- Data Management -->
+    <div id="data-management" class="bg-white rounded-lg shadow mb-8 scroll-mt-28">
+        <div class="p-6 border-b">
+            <h3 class="text-lg font-semibold text-gray-800">System Data Management</h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <h4 class="font-medium text-gray-800">Export Books</h4>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">Export with format, filters, and custom columns. Exports above 10,000 rows are queued automatically.</p>
+                    <form action="{{ route('admin.books.export') }}" method="POST" class="space-y-2">
+                        @csrf
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="format" class="rounded-md border-gray-300 text-sm">
+                                <option value="xlsx">XLSX</option>
+                                <option value="csv">CSV</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <select name="category_id" class="rounded-md border-gray-300 text-sm">
+                                <option value="">All categories</option>
+                                @foreach($categories as $category)
+                                    <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-1 gap-2">
+                            <select name="stock_status" class="rounded-md border-gray-300 text-sm">
+                                <option value="">All stock states</option>
+                                <option value="in_stock">In stock</option>
+                                <option value="out_of_stock">Out of stock</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="number" step="0.01" min="0" name="min_price" placeholder="Min price" class="rounded-md border-gray-300 text-sm">
+                            <input type="number" step="0.01" min="0" name="max_price" placeholder="Max price" class="rounded-md border-gray-300 text-sm">
+                        </div>
+                        <input type="text" name="search" placeholder="Search title, author, ISBN" class="w-full rounded-md border-gray-300 text-sm">
+                        <label class="block text-xs font-medium text-gray-600">Columns</label>
+                        <div class="grid grid-cols-2 gap-1 text-xs text-gray-700">
+                            @foreach(\App\Exports\BooksExport::availableColumns() as $key => $label)
+                                <label class="inline-flex items-center gap-1">
+                                    <input type="checkbox" name="columns[]" value="{{ $key }}" checked>
+                                    <span>{{ $label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <button type="submit" class="inline-flex w-full justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition">
+                            Start Export
+                        </button>
+                    </form>
+                </div>
+
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-6 h-6 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <h4 class="font-medium text-gray-800">Import Books</h4>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-2">Use strict template headers, preview, and then import with duplicate handling mode.</p>
+                    <a href="{{ route('admin.books.import.template') }}" class="inline-flex mb-3 text-xs text-green-700 hover:text-green-900">Download import template (CSV)</a>
+                    <form action="{{ route('admin.books.import.preview') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <div class="flex flex-col gap-2">
+                            <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                            <button type="submit" class="inline-flex w-full justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none transition">
+                                Upload & Preview
+                            </button>
+                        </div>
+                        @error('file')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </form>
+                </div>
+
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-6 h-6 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                        <h4 class="font-medium text-gray-800">Export Orders</h4>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">Export order data with date/status filters and custom fields. Large exports are queued automatically.</p>
+                    <form action="{{ route('admin.orders.export') }}" method="POST" class="space-y-2">
+                        @csrf
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="format" class="rounded-md border-gray-300 text-sm">
+                                <option value="xlsx">XLSX</option>
+                                <option value="csv">CSV</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <select name="status" class="rounded-md border-gray-300 text-sm">
+                                <option value="">All statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="processing">Processing</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="from_date" class="rounded-md border-gray-300 text-sm">
+                            <input type="date" name="to_date" class="rounded-md border-gray-300 text-sm">
+                        </div>
+                        <input type="text" name="search" placeholder="Search order id, customer, email" class="w-full rounded-md border-gray-300 text-sm">
+                        <label class="block text-xs font-medium text-gray-600">Columns</label>
+                        <div class="grid grid-cols-2 gap-1 text-xs text-gray-700">
+                            @foreach(\App\Exports\OrdersExport::availableColumns() as $key => $label)
+                                <label class="inline-flex items-center gap-1">
+                                    <input type="checkbox" name="columns[]" value="{{ $key }}" checked>
+                                    <span>{{ $label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <button type="submit" class="inline-flex w-full justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none transition">
+                            Start Orders Export
+                        </button>
+                    </form>
+                </div>
+
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-6 h-6 text-sky-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5V4H2v16h5m10 0v-2a4 4 0 00-4-4H11a4 4 0 00-4 4v2m10 0H7m10 0h-2m-6 0H7m4-8a3 3 0 110-6 3 3 0 010 6z"></path></svg>
+                        <h4 class="font-medium text-gray-800">Export Users</h4>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">Export users with optional PII redaction for email and address fields.</p>
+                    <form action="{{ route('admin.users.export') }}" method="POST" class="space-y-2">
+                        @csrf
+                        <div class="grid grid-cols-2 gap-2">
+                            <select name="format" class="rounded-md border-gray-300 text-sm">
+                                <option value="xlsx">XLSX</option>
+                                <option value="csv">CSV</option>
+                                <option value="pdf">PDF</option>
+                            </select>
+                            <select name="role" class="rounded-md border-gray-300 text-sm">
+                                <option value="">All roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="customer">Customer</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="from_date" class="rounded-md border-gray-300 text-sm">
+                            <input type="date" name="to_date" class="rounded-md border-gray-300 text-sm">
+                        </div>
+                        <input type="text" name="search" placeholder="Search name or email" class="w-full rounded-md border-gray-300 text-sm">
+                        <div class="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                            <label class="inline-flex items-center gap-1">
+                                <input type="checkbox" name="redact_email" value="1">
+                                <span>Redact email</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1">
+                                <input type="checkbox" name="redact_address" value="1">
+                                <span>Redact address</span>
+                            </label>
+                        </div>
+                        <label class="block text-xs font-medium text-gray-600">Columns</label>
+                        <div class="grid grid-cols-2 gap-1 text-xs text-gray-700">
+                            @foreach(\App\Exports\UsersExport::availableColumns() as $key => $label)
+                                <label class="inline-flex items-center gap-1">
+                                    <input type="checkbox" name="columns[]" value="{{ $key }}" checked>
+                                    <span>{{ $label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <button type="submit" class="inline-flex w-full justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-sky-600 hover:bg-sky-700 focus:outline-none transition">
+                            Start Users Export
+                        </button>
+                    </form>
+                </div>
+
+                <div class="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-6 h-6 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <h4 class="font-medium text-gray-800">Import Users</h4>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-2">Use strict user template and duplicate mode (skip/update by email).</p>
+                    <a href="{{ route('admin.users.import.template') }}" class="inline-flex mb-3 text-xs text-teal-700 hover:text-teal-900">Download user import template (CSV)</a>
+                    <form action="{{ route('admin.users.import.preview') }}" method="POST" enctype="multipart/form-data">
+                        @csrf
+                        <div class="flex flex-col gap-2">
+                            <input type="file" name="file" accept=".xlsx,.xls,.csv" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100">
+                            <button type="submit" class="inline-flex w-full justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-teal-600 hover:bg-teal-700 focus:outline-none transition">
+                                Upload & Preview Users
+                            </button>
+                        </div>
+                        @error('file')
+                            <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                        @enderror
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="transfer-jobs" class="bg-white rounded-lg shadow mb-8 scroll-mt-28" x-data="transferJobsWidget({ initialJobs: @js($recentTransfersPayload), endpoint: '{{ route('admin.transfer-jobs.progress') }}' })" x-init="init()" x-on:beforeunload.window="destroy()">
+        <div class="p-6 border-b flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800">Data Transfer Jobs</h3>
+            <span class="text-xs text-gray-500">Auto-refreshes every few seconds</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Requested By</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">File</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status & Progress</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Result</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <template x-if="jobs.length === 0">
+                        <tr>
+                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">No transfer jobs yet.</td>
+                        </tr>
+                    </template>
+                    <template x-for="job in jobs" :key="job.id">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm text-gray-700 uppercase" x-text="job.type"></td>
+                            <td class="px-6 py-4 text-sm text-gray-600" x-text="job.requested_by"></td>
+                            <td class="px-6 py-4 text-sm text-gray-600" x-text="job.file"></td>
+                            <td class="px-6 py-4 min-w-[220px]">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full" :class="job.status_class" x-text="job.status_label"></span>
+                                <div class="mt-2">
+                                    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div class="h-full transition-all duration-500 ease-out" :class="job.progress_bar_class" :style="`width: ${job.progress}%`"></div>
+                                    </div>
+                                    <div class="mt-1 text-xs text-gray-500" x-text="`${job.progress}%`"></div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm" :class="job.result_class">
+                                <template x-if="job.download_url">
+                                    <a :href="job.download_url" class="text-indigo-600 hover:text-indigo-800">Download file</a>
+                                </template>
+                                <template x-if="!job.download_url">
+                                    <span x-text="job.result_text"></span>
+                                </template>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600" x-text="job.created_human"></td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="recent-audit" class="bg-white rounded-lg shadow mb-8 scroll-mt-28">
+        <div class="p-6 border-b flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800">Recent Audit Logs</h3>
+            <a href="{{ route('admin.audit-logs.index') }}" class="text-sm text-indigo-600 hover:text-indigo-800">View Full Log →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    @forelse($recentAuditLogs as $log)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $log->created_at?->diffForHumans() }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-700">{{ $log->user?->name ?? 'System' }}</td>
+                            <td class="px-6 py-4 text-sm text-indigo-700 font-medium">{{ $log->action }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">{{ $log->description ?? '-' }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-6 py-4 text-center text-gray-500">No audit logs yet.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- Recent Orders -->
-    <div class="bg-white rounded-lg shadow mb-8">
+    <div id="recent-orders" class="bg-white rounded-lg shadow mb-8 scroll-mt-28">
         <div class="p-6 border-b">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-800">Recent Orders</h3>
@@ -172,7 +569,7 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 text-sm font-medium text-gray-900">#{{ $order->id }}</td>
                             <td class="px-6 py-4 text-sm text-gray-600">{{ $order->user?->name ?? 'Deleted User' }}</td>
-                            <td class="px-6 py-4 text-sm text-gray-600">${{ number_format($order->total_amount, 2) }}</td>
+                            <td class="px-6 py-4 text-sm text-gray-600">₱{{ number_format($order->total_amount, 2) }}</td>
                             <td class="px-6 py-4">
                                 @php
                                     $statusColors = [
@@ -202,7 +599,7 @@
     </div>
 
     <!-- Recent Reviews -->
-    <div class="bg-white rounded-lg shadow">
+    <div id="recent-reviews" class="bg-white rounded-lg shadow scroll-mt-28">
         <div class="p-6 border-b">
             <h3 class="text-lg font-semibold text-gray-800">Recent Reviews</h3>
         </div>

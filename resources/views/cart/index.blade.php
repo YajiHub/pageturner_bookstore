@@ -33,8 +33,8 @@
                                 <div class="text-red-600">Out of Stock</div>
                             @endif
                         </td>
-                        <td class="align-middle">${{ number_format($book->price, 2) }}</td>
-                        <td class="align-middle">${{ number_format($book->price * $cart[$book->id], 2) }}</td>
+                        <td class="align-middle">₱{{ number_format($book->price, 2) }}</td>
+                        <td class="align-middle">₱{{ number_format($book->price * $cart[$book->id], 2) }}</td>
                         <td class="align-middle">
                             <form action="{{ route('cart.remove', $book) }}" method="POST">
                                 @csrf
@@ -46,7 +46,7 @@
                 @endforeach
             </tbody>
         </table>
-        <div class="mb-6 font-bold text-xl">Total: ${{ number_format($total, 2) }}</div>
+        <div class="mb-6 font-bold text-xl">Total: ₱{{ number_format($total, 2) }}</div>
         <form action="{{ route('cart.clear') }}" method="POST" class="inline">
             @csrf
             <button type="submit" class="bg-gray-300 px-4 py-2 rounded">Clear Cart</button>

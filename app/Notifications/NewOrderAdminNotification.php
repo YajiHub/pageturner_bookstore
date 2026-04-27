@@ -11,9 +11,7 @@ class NewOrderAdminNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public Order $order)
-    {
-    }
+    public function __construct(public Order $order) {}
 
     public function via(object $notifiable): array
     {
@@ -23,12 +21,12 @@ class NewOrderAdminNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('New Order #' . $this->order->id . ' Received')
+            ->subject('New Order #'.$this->order->id.' Received')
             ->greeting('Hello Admin!')
-            ->line('A new order has been placed by ' . $this->order->user->name . '.')
-            ->line('Order #' . $this->order->id)
-            ->line('Total Amount: $' . number_format($this->order->total_amount, 2))
-            ->action('View Order', url('/orders/' . $this->order->id))
+            ->line('A new order has been placed by '.$this->order->user->name.'.')
+            ->line('Order #'.$this->order->id)
+            ->line('Total Amount: ₱'.number_format($this->order->total_amount, 2))
+            ->action('View Order', url('/orders/'.$this->order->id))
             ->line('Please review and process this order.');
     }
 
@@ -36,7 +34,7 @@ class NewOrderAdminNotification extends Notification
     {
         return [
             'order_id' => $this->order->id,
-            'message' => 'New order #' . $this->order->id . ' placed by ' . $this->order->user->name,
+            'message' => 'New order #'.$this->order->id.' placed by '.$this->order->user->name,
             'total_amount' => $this->order->total_amount,
             'customer_name' => $this->order->user->name,
         ];

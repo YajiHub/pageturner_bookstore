@@ -80,7 +80,7 @@
                                 <p class="text-sm text-gray-500">{{ $order->created_at->format('M d, Y') }} · {{ $order->orderItems->count() }} item(s)</p>
                             </div>
                             <div class="text-right">
-                                <p class="font-medium text-gray-800">${{ number_format($order->total_amount, 2) }}</p>
+                                <p class="font-medium text-gray-800">₱{{ number_format($order->total_amount, 2) }}</p>
                                 @php
                                     $statusColors = [
                                         'pending' => 'bg-yellow-100 text-yellow-800',
@@ -177,6 +177,26 @@
             <a href="{{ route('cart.index') }}" class="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition">
                 <svg class="w-5 h-5 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"></path></svg>
                 <span class="text-sm font-medium text-orange-700">View Cart</span>
+            </a>
+            <a href="{{ route('dashboard.export-data') }}" class="flex items-center p-3 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition">
+                <svg class="w-5 h-5 text-emerald-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-8m0 0l-3 3m3-3l3 3m-6 4v2a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>
+                <span class="text-sm font-medium text-emerald-700">Export My Data (JSON)</span>
+            </a>
+            <a href="{{ route('dashboard.export-orders', ['format' => 'xlsx']) }}" class="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11v6m0 0l-3-3m3 3l3-3m5-5H7a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2v-7a2 2 0 00-2-2z"></path></svg>
+                <span class="text-sm font-medium text-blue-700">Export Orders (Excel)</span>
+            </a>
+            <a href="{{ route('dashboard.export-orders', ['format' => 'pdf']) }}" class="flex items-center p-3 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition">
+                <svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V8l-5-5H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                <span class="text-sm font-medium text-indigo-700">Export Orders (PDF)</span>
+            </a>
+            <a href="{{ route('dashboard.export-reading-history', ['format' => 'xlsx']) }}" class="flex items-center p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition">
+                <svg class="w-5 h-5 text-amber-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4 1.79 4 4-1.79 4-4 4m0-16v2m0 12v2m8-8h-2M6 12H4m11.07-7.07l-1.42 1.42M8.35 15.65l-1.42 1.42m0-11.14l1.42 1.42m9.9 9.9l1.42 1.42"></path></svg>
+                <span class="text-sm font-medium text-amber-700">Export Reading History (Excel)</span>
+            </a>
+            <a href="{{ route('dashboard.export-reading-history', ['format' => 'pdf']) }}" class="flex items-center p-3 bg-rose-50 rounded-lg hover:bg-rose-100 transition">
+                <svg class="w-5 h-5 text-rose-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l4.414 4.414A1 1 0 0118 8.414V19a2 2 0 01-2 2z"></path></svg>
+                <span class="text-sm font-medium text-rose-700">Export Reading History (PDF)</span>
             </a>
         </div>
     </div>

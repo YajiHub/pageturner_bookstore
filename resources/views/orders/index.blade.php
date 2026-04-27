@@ -24,7 +24,7 @@
                                 {{ $order->status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
                                 {{ ucfirst($order->status) }}
                             </span>
-                            <p class="text-lg font-bold text-gray-800 mt-1">${{ number_format($order->total_amount, 2) }}</p>
+                            <p class="text-lg font-bold text-gray-800 mt-1">₱{{ number_format($order->total_amount, 2) }}</p>
                             <a href="{{ route('orders.show', $order) }}" class="text-sm text-indigo-600 hover:underline">View Details →</a>
                         </div>
                     </div>
@@ -53,7 +53,7 @@
                                     </div>
                                     <div class="text-right">
                                         <p class="text-gray-600">Qty: {{ $item->quantity }}</p>
-                                        <p class="font-medium">${{ number_format($item->subtotal, 2) }}</p>
+                                        <p class="font-medium">₱{{ number_format($item->subtotal, 2) }}</p>
                                     </div>
                                 </div>
                             @endforeach

@@ -51,8 +51,8 @@
                                 </div>
                                 
                                 <div class="text-right">
-                                    <p class="text-gray-600">${{ number_format($item->unit_price, 2) }} × {{ $item->quantity }}</p>
-                                    <p class="font-bold text-gray-800">${{ number_format($item->subtotal, 2) }}</p>
+                                    <p class="text-gray-600">₱{{ number_format($item->unit_price, 2) }} × {{ $item->quantity }}</p>
+                                    <p class="font-bold text-gray-800">₱{{ number_format($item->subtotal, 2) }}</p>
                                 </div>
                             </div>
                         @endforeach
@@ -64,7 +64,7 @@
                     <div class="flex justify-end">
                         <div class="text-right">
                             <p class="text-gray-600">Total</p>
-                            <p class="text-2xl font-bold text-indigo-600">${{ number_format($order->total_amount, 2) }}</p>
+                            <p class="text-2xl font-bold text-indigo-600">₱{{ number_format($order->total_amount, 2) }}</p>
                         </div>
                     </div>
                 </div>

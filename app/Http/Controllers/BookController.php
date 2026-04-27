@@ -2,13 +2,37 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\BooksExport;
+use App\Jobs\ProcessBooksImportJob;
+use App\Jobs\QueuedBooksExportJob;
 use App\Models\Book;
 use App\Models\Category;
+use App\Models\DataTransferJob;
+use App\Models\ExportLog;
+use App\Models\ImportLog;
+use App\Models\ReadingHistory;
+use App\Models\User;
+use App\Notifications\BookCatalogUpdatedNotification;
+use App\Support\ExcelReaderTypeResolver;
+use App\Services\AuditLogger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Excel as ExcelWriter;
+use Maatwebsite\Excel\Facades\Excel;
 
 class BookController extends Controller
 {
+    private const REQUIRED_IMPORT_HEADERS = ['title', 'author', 'isbn', 'price', 'stock', 'category', 'description'];
+
+    private const IMPORT_HEADER_ALIASES = [
+        'stock_quantity' => 'stock',
+        'category_name' => 'category',
+    ];
+
     public function index(Request $request)
     {
         $query = Book::with('category');
@@ -56,9 +80,9 @@ class BookController extends Controller
                 $query->leftJoinSub($reviewsSub, 'r', function ($join) {
                     $join->on('books.id', '=', 'r.book_id');
                 })
-                ->select('books.*')
-                ->orderByRaw('COALESCE(r.avg_rating, 0) desc')
-                ->orderBy('books.id', 'asc');
+                    ->select('books.*')
+                    ->orderByRaw('COALESCE(r.avg_rating, 0) desc')
+                    ->orderBy('books.id', 'asc');
 
                 break;
             default:
@@ -77,6 +101,7 @@ class BookController extends Controller
         $this->authorize('create', Book::class);
 
         $categories = Category::all();
+
         return view('books.create', compact('categories'));
     }
 
@@ -99,33 +124,42 @@ class BookController extends Controller
             // Resize image to max 400x600 and save using GD (no Intervention required)
             $image = $request->file('cover_image');
 
-            if (method_exists($image, 'isValid') && !$image->isValid()) {
+            if (method_exists($image, 'isValid') && ! $image->isValid()) {
                 return back()->withErrors(['cover_image' => 'Upload failed (PHP reported an error).']);
             }
 
             $imagePath = is_string($image) ? $image : $image->getRealPath();
-            if (!$imagePath || !file_exists($imagePath)) {
+            if (! $imagePath || ! file_exists($imagePath)) {
                 return back()->withErrors(['cover_image' => 'Uploaded file not found on disk.']);
             }
 
             $destDir = storage_path('app/public/covers');
-            if (!file_exists($destDir)) {
+            if (! file_exists($destDir)) {
                 @mkdir($destDir, 0755, true);
             }
 
-            $filename = uniqid() . '.' . $image->getClientOriginalExtension();
-            $destPath = $destDir . '/' . $filename;
+            $filename = uniqid().'.'.$image->getClientOriginalExtension();
+            $destPath = $destDir.'/'.$filename;
 
             $err = null;
             $ok = $this->resizeAndSaveWithGd($imagePath, $destPath, 400, 600, 85, $err);
-            if (!$ok) {
+            if (! $ok) {
                 return back()->withErrors(['cover_image' => $err ?? 'Failed to process image (GD not available or file invalid).']);
             }
 
-            $validated['cover_image'] = 'covers/' . $filename;
+            $validated['cover_image'] = 'covers/'.$filename;
         }
 
-        Book::create($validated);
+        $book = Book::create($validated);
+
+        AuditLogger::log(
+            action: 'book.created',
+            auditable: $book,
+            newValues: $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity']),
+            description: 'Book created by admin.'
+        );
+
+        $this->notifyAdminBookCatalogUpdate('created', $book->title, $book->id);
 
         return redirect()->route('books.index')
             ->with('success', 'Book added successfully!');
@@ -134,18 +168,39 @@ class BookController extends Controller
     public function show(Book $book)
     {
         $book->load(['category', 'reviews.user']);
-        
+
         // Check if user has a COMPLETED order with this book (can review)
         $hasPurchased = false;
-        if (auth()->check()) {
-            $hasPurchased = auth()->user()->orders()
+        $userReview = null;
+        if (Auth::check()) {
+            /** @var \App\Models\User $currentUser */
+            $currentUser = Auth::user();
+
+            $hasPurchased = $currentUser->orders()
                 ->where('status', 'completed')
                 ->whereHas('orderItems', function ($query) use ($book) {
                     $query->where('book_id', $book->id);
                 })->exists();
+
+            if (! $currentUser->isAdmin()) {
+                $userReview = $book->reviews->firstWhere('user_id', $currentUser->id);
+            }
+
+            if (! $currentUser->isAdmin() && Schema::hasTable('reading_histories')) {
+                $history = ReadingHistory::firstOrNew([
+                    'user_id' => Auth::id(),
+                    'book_id' => $book->id,
+                    'order_id' => null,
+                    'event_type' => 'viewed',
+                ]);
+
+                $history->quantity = ($history->exists ? (int) $history->quantity : 0) + 1;
+                $history->last_seen_at = now();
+                $history->save();
+            }
         }
-        
-        return view('books.show', compact('book', 'hasPurchased'));
+
+        return view('books.show', compact('book', 'hasPurchased', 'userReview'));
     }
 
     public function edit(Book $book)
@@ -153,6 +208,7 @@ class BookController extends Controller
         $this->authorize('update', $book);
 
         $categories = Category::all();
+
         return view('books.edit', compact('book', 'categories'));
     }
 
@@ -164,7 +220,7 @@ class BookController extends Controller
             'category_id' => 'required|exists:categories,id',
             'title' => 'required|string|max:255',
             'author' => 'required|string|max:255',
-            'isbn' => 'required|string|unique:books,isbn,' . $book->id,
+            'isbn' => 'required|string|unique:books,isbn,'.$book->id,
             'price' => 'required|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
             'description' => 'nullable|string',
@@ -175,33 +231,45 @@ class BookController extends Controller
             // Resize image to max 400x600 and save using GD (no Intervention required)
             $image = $request->file('cover_image');
 
-            if (method_exists($image, 'isValid') && !$image->isValid()) {
+            if (method_exists($image, 'isValid') && ! $image->isValid()) {
                 return back()->withErrors(['cover_image' => 'Upload failed (PHP reported an error).']);
             }
 
             $imagePath = is_string($image) ? $image : $image->getRealPath();
-            if (!$imagePath || !file_exists($imagePath)) {
+            if (! $imagePath || ! file_exists($imagePath)) {
                 return back()->withErrors(['cover_image' => 'Uploaded file not found on disk.']);
             }
 
             $destDir = storage_path('app/public/covers');
-            if (!file_exists($destDir)) {
+            if (! file_exists($destDir)) {
                 @mkdir($destDir, 0755, true);
             }
 
-            $filename = uniqid() . '.' . $image->getClientOriginalExtension();
-            $destPath = $destDir . '/' . $filename;
+            $filename = uniqid().'.'.$image->getClientOriginalExtension();
+            $destPath = $destDir.'/'.$filename;
 
             $err = null;
             $ok = $this->resizeAndSaveWithGd($imagePath, $destPath, 400, 600, 85, $err);
-            if (!$ok) {
+            if (! $ok) {
                 return back()->withErrors(['cover_image' => $err ?? 'Failed to process image (GD not available or file invalid).']);
             }
 
-            $validated['cover_image'] = 'covers/' . $filename;
+            $validated['cover_image'] = 'covers/'.$filename;
         }
 
+        $before = $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity', 'description', 'cover_image']);
+
         $book->update($validated);
+
+        AuditLogger::log(
+            action: 'book.updated',
+            auditable: $book,
+            oldValues: $before,
+            newValues: $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity', 'description', 'cover_image']),
+            description: 'Book updated by admin.'
+        );
+
+        $this->notifyAdminBookCatalogUpdate('updated', $book->title, $book->id);
 
         return redirect()->route('books.show', $book)
             ->with('success', 'Book updated successfully!');
@@ -211,30 +279,336 @@ class BookController extends Controller
     {
         $this->authorize('delete', $book);
 
+        $snapshot = $book->only(['category_id', 'title', 'author', 'isbn', 'price', 'stock_quantity']);
         $book->delete();
+
+        AuditLogger::log(
+            action: 'book.deleted',
+            oldValues: $snapshot,
+            description: 'Book deleted by admin.'
+        );
+
+        $this->notifyAdminBookCatalogUpdate('deleted', (string) ($snapshot['title'] ?? 'Unknown'), null);
 
         return redirect()->route('books.index')
             ->with('success', 'Book deleted successfully!');
     }
 
+    private function notifyAdminBookCatalogUpdate(string $action, string $bookTitle, ?int $bookId): void
+    {
+        $actorId = Auth::id();
+        $actorName = Auth::user()?->name ?? 'System';
 
-    protected function resizeAndSaveWithGd(string $srcPath, string $destPath, int $maxW, int $maxH, int $quality = 85, ?string & $error = null): bool
+        User::where('role', 'admin')
+            ->when($actorId, fn ($query) => $query->where('id', '!=', $actorId))
+            ->each(function (User $admin) use ($action, $bookTitle, $bookId, $actorName): void {
+                $admin->notify(new BookCatalogUpdatedNotification($action, $bookTitle, $bookId, $actorName));
+            });
+    }
+
+    public function importPreview(Request $request)
+    {
+        $this->authorize('create', Book::class);
+
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv|max:10240', // 10MB max
+        ]);
+
+        // Temporarily store the parsed file
+        $file = $request->file('file');
+        $originalName = $file->getClientOriginalName();
+        $path = $file->store('imports', 'local');
+        $readerType = ExcelReaderTypeResolver::fromFilename($originalName);
+
+        // Extract a preview of the data (assuming first sheet)
+        $data = Excel::toArray(new \stdClass, $path, 'local', $readerType);
+        $rows = $data[0] ?? [];
+
+        $totalRows = count($rows);
+        $headers = $totalRows > 0 ? $rows[0] : [];
+        $normalizedHeaders = array_map(fn ($header) => $this->normalizeImportHeader((string) $header), $headers);
+
+        if (! $this->isSupportedImportHeaderSet($normalizedHeaders)) {
+            Storage::disk('local')->delete($path);
+
+            return redirect()->route('admin.dashboard')->with('error', 'Invalid import headers. Use the import template or a books export containing title, author, isbn, price, stock/stock_quantity, and category/category_name.');
+        }
+
+        $dataRows = $totalRows > 1 ? array_slice($rows, 1, 5) : []; // Show first 5 rows for preview
+        $recordCount = max(0, $totalRows - 1); // Exclude header
+
+        return view('admin.books.import_preview', compact('path', 'originalName', 'headers', 'dataRows', 'recordCount'));
+    }
+
+    public function importProcess(Request $request)
+    {
+        $this->authorize('create', Book::class);
+
+        $request->validate([
+            'filepath' => 'required|string',
+            'duplicate_strategy' => 'required|in:skip,update',
+        ]);
+
+        $path = $request->input('filepath');
+        $originalName = $request->input('original_name');
+        $duplicateStrategy = $request->input('duplicate_strategy', 'skip');
+        $readerType = ExcelReaderTypeResolver::fromFilename($originalName ?: $path);
+
+        if (! Storage::disk('local')->exists($path)) {
+            return redirect()->route('admin.dashboard')->with('error', 'Import file expired or not found.');
+        }
+
+        $transfer = DataTransferJob::create([
+            'user_id' => Auth::id(),
+            'type' => 'import',
+            'status' => 'queued',
+            'progress_percentage' => 0,
+            'original_filename' => $originalName,
+            'stored_path' => $path,
+            'options' => [
+                'duplicate_strategy' => $duplicateStrategy,
+                'reader_type' => $readerType,
+            ],
+            'total_rows' => max(0, (int) $request->input('record_count', 0)),
+        ]);
+
+        $importLog = ImportLog::create([
+            'user_id' => Auth::id(),
+            'data_transfer_job_id' => $transfer->id,
+            'filename' => $originalName,
+            'status' => 'queued',
+        ]);
+
+        AuditLogger::log(
+            action: 'transfer.import.queued',
+            auditable: $transfer,
+            newValues: [
+                'original_filename' => $originalName,
+                'stored_path' => $path,
+                'duplicate_strategy' => $duplicateStrategy,
+                'reader_type' => $readerType,
+            ],
+            description: 'Books import queued by admin.'
+        );
+
+        ProcessBooksImportJob::dispatch($transfer->id, $duplicateStrategy, $importLog->id);
+
+        return redirect()->route('admin.dashboard')->with('success', 'Import queued. Track progress in Data Transfer Jobs.');
+    }
+
+    public function downloadImportTemplate()
+    {
+        $this->authorize('create', Book::class);
+
+        $headers = implode(',', self::REQUIRED_IMPORT_HEADERS);
+        $sample = 'Sample Book,Sample Author,9781234567897,19.99,15,Fiction,Sample description';
+        $content = $headers.PHP_EOL.$sample.PHP_EOL;
+
+        return response($content)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="books_import_template.csv"');
+    }
+
+    public function export(Request $request)
+    {
+        $this->authorize('create', Book::class); // typically admins
+
+        $validated = $request->validate([
+            'format' => 'nullable|in:xlsx,csv,pdf',
+            'columns' => 'nullable|array',
+            'columns.*' => 'string',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'search' => 'nullable|string|max:255',
+            'min_price' => 'nullable|numeric|min:0',
+            'max_price' => 'nullable|numeric|min:0',
+            'stock_status' => 'nullable|in:in_stock,out_of_stock',
+        ]);
+
+        $format = $validated['format'] ?? 'xlsx';
+        $columns = BooksExport::normalizeColumns($validated['columns'] ?? []);
+        $filters = [
+            'category_id' => $validated['category_id'] ?? null,
+            'search' => $validated['search'] ?? null,
+            'min_price' => $validated['min_price'] ?? null,
+            'max_price' => $validated['max_price'] ?? null,
+            'stock_status' => $validated['stock_status'] ?? null,
+        ];
+
+        $exportQuery = (new BooksExport($filters, $columns))->query();
+        $totalRows = (clone $exportQuery)->count();
+        $filename = 'books_export_'.now()->format('Y_m_d_His').'.'.$format;
+
+        $transfer = DataTransferJob::create([
+            'user_id' => Auth::id(),
+            'type' => 'export',
+            'status' => $totalRows > 10000 ? 'queued' : 'processing',
+            'progress_percentage' => $totalRows > 10000 ? 0 : 90,
+            'original_filename' => $filename,
+            'options' => [
+                'entity' => 'books',
+                'format' => $format,
+                'filters' => $filters,
+                'columns' => $columns,
+            ],
+            'total_rows' => $totalRows,
+        ]);
+
+        $exportLog = ExportLog::create([
+            'user_id' => Auth::id(),
+            'data_transfer_job_id' => $transfer->id,
+            'format' => $format,
+            'filters' => $filters,
+            'selected_columns' => $columns,
+            'status' => $totalRows > 10000 ? 'queued' : 'processing',
+        ]);
+
+        AuditLogger::log(
+            action: 'transfer.export.queued',
+            auditable: $transfer,
+            newValues: [
+                'original_filename' => $transfer->original_filename,
+                'format' => $format,
+                'total_rows' => $totalRows,
+                'filters' => $filters,
+                'selected_columns' => $columns,
+            ],
+            description: 'Books export queued by admin.'
+        );
+
+        if ($totalRows > 10000) {
+            QueuedBooksExportJob::dispatch($transfer->id, $filters, $columns, $format, $exportLog->id);
+
+            return redirect()->route('admin.dashboard')->with('success', 'Export queued. Refresh Data Transfer Jobs to download when ready.');
+        }
+
+        $resultPath = 'exports/'.$filename;
+
+        try {
+            $this->storeExportFile($format, $resultPath, $filters, $columns);
+
+            $transfer->update([
+                'status' => 'completed',
+                'result_path' => $resultPath,
+                'finished_at' => now(),
+                'progress_percentage' => 100,
+            ]);
+
+            $exportLog->update([
+                'status' => 'completed',
+                'download_link' => route('admin.books.export.download', $transfer),
+                'rows_exported' => $totalRows,
+            ]);
+
+            AuditLogger::log(
+                action: 'transfer.export.completed',
+                auditable: $transfer,
+                newValues: ['result_path' => $resultPath],
+                description: 'Books export completed synchronously by admin.'
+            );
+
+            return response()->download(Storage::disk('local')->path($resultPath), basename($resultPath));
+        } catch (\Throwable $e) {
+            $transfer->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
+                'finished_at' => now(),
+                'progress_percentage' => 100,
+            ]);
+
+            $exportLog->update([
+                'status' => 'failed',
+            ]);
+
+            return redirect()->route('admin.dashboard')->with('error', 'Export failed: '.$e->getMessage());
+        }
+    }
+
+    public function downloadExport(DataTransferJob $transfer)
+    {
+        $this->authorize('create', Book::class);
+
+        if ($transfer->type !== 'export' || (($transfer->options['entity'] ?? 'books') !== 'books')) {
+            return redirect()->route('admin.dashboard')->with('error', 'Invalid export transfer selected.');
+        }
+
+        if ($transfer->status !== 'completed' || ! $transfer->result_path || ! Storage::disk('local')->exists($transfer->result_path)) {
+            return redirect()->route('admin.dashboard')->with('error', 'Export file is not ready or no longer available.');
+        }
+
+        AuditLogger::log(
+            action: 'transfer.export.downloaded',
+            auditable: $transfer,
+            newValues: ['result_path' => $transfer->result_path],
+            description: 'Completed export downloaded by admin.'
+        );
+
+        return response()->download(Storage::disk('local')->path($transfer->result_path), basename($transfer->result_path));
+    }
+
+    private function normalizeImportHeader(string $header): string
+    {
+        return str_replace(' ', '_', mb_strtolower(trim($header)));
+    }
+
+    private function normalizeImportHeaderAlias(string $header): string
+    {
+        return self::IMPORT_HEADER_ALIASES[$header] ?? $header;
+    }
+
+    private function isSupportedImportHeaderSet(array $headers): bool
+    {
+        $normalized = array_map(fn (string $header) => $this->normalizeImportHeaderAlias($header), $headers);
+        $headerSet = array_fill_keys($normalized, true);
+
+        $required = ['title', 'author', 'isbn', 'price', 'stock', 'category'];
+        foreach ($required as $column) {
+            if (! isset($headerSet[$column])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function storeExportFile(string $format, string $resultPath, array $filters, array $columns): void
+    {
+        if ($format === 'pdf') {
+            $export = new BooksExport($filters, $columns);
+            $books = $export->query()->get();
+            $pdf = Pdf::loadView('admin.books.exports.pdf', [
+                'books' => $books,
+                'columns' => BooksExport::normalizeColumns($columns),
+                'headings' => BooksExport::availableColumns(),
+            ]);
+            Storage::disk('local')->put($resultPath, $pdf->output());
+
+            return;
+        }
+
+        $writerType = $format === 'csv' ? ExcelWriter::CSV : ExcelWriter::XLSX;
+        Excel::store(new BooksExport($filters, $columns), $resultPath, 'local', $writerType);
+    }
+
+    protected function resizeAndSaveWithGd(string $srcPath, string $destPath, int $maxW, int $maxH, int $quality = 85, ?string &$error = null): bool
     {
         $error = null;
-        if (!extension_loaded('gd')) {
+        if (! extension_loaded('gd')) {
             $error = 'GD extension is not available on this server.';
+
             return false;
         }
 
         $info = @getimagesize($srcPath);
         if ($info === false) {
             $error = 'Unable to read image information.';
+
             return false;
         }
 
         [$w, $h, $type] = [$info[0], $info[1], $info[2]];
         if ($w <= 0 || $h <= 0) {
             $error = 'Invalid image dimensions.';
+
             return false;
         }
 
@@ -242,6 +616,7 @@ class BookController extends Controller
         $maxPixels = 12000000; // ~12 million pixels (e.g., 4000x3000)
         if (($w * $h) > $maxPixels) {
             $error = 'Image dimensions are too large. Please resize the image before uploading.';
+
             return false;
         }
 
@@ -251,9 +626,11 @@ class BookController extends Controller
 
         // Helper to parse shorthand memory values like '128M'
         $parseBytes = function ($val) {
-            if (is_int($val)) return $val;
+            if (is_int($val)) {
+                return $val;
+            }
             $val = trim($val);
-            $last = strtolower($val[strlen($val)-1]);
+            $last = strtolower($val[strlen($val) - 1]);
             $num = (int) $val;
             switch ($last) {
                 case 'g': return $num * 1024 * 1024 * 1024;
@@ -285,6 +662,7 @@ class BookController extends Controller
         // If still insufficient, refuse to process to avoid fatal OOM.
         if ($memLimitBytes > 0 && $estimatedBytes > ($available * 0.95)) {
             $error = 'Not enough memory to process this image. Reduce image size or increase PHP memory_limit.';
+
             return false;
         }
 
@@ -313,7 +691,7 @@ class BookController extends Controller
                 $src = @imagecreatefromgif($srcPath);
                 break;
             case IMAGETYPE_WEBP:
-                if (!function_exists('imagecreatefromwebp')) {
+                if (! function_exists('imagecreatefromwebp')) {
                     return false;
                 }
                 $src = @imagecreatefromwebp($srcPath);
@@ -324,13 +702,15 @@ class BookController extends Controller
 
         if ($src === false) {
             $error = 'Failed to read the source image (possibly corrupt or unsupported).';
+
             return false;
         }
 
-        if (!imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h)) {
+        if (! imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h)) {
             imagedestroy($src);
             imagedestroy($dst);
             $error = 'Failed while resampling the image.';
+
             return false;
         }
 
@@ -357,6 +737,7 @@ class BookController extends Controller
         if (! $ok) {
             $error = 'Failed to save the processed image.';
         }
+
         return (bool) $ok;
     }
 }

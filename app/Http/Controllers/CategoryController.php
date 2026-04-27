@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
@@ -10,6 +11,7 @@ class CategoryController extends Controller
     public function index()
     {
         $categories = Category::withCount('books')->paginate(10);
+
         return view('categories.index', compact('categories'));
     }
 
@@ -29,7 +31,14 @@ class CategoryController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        Category::create($validated);
+        $category = Category::create($validated);
+
+        AuditLogger::log(
+            action: 'category.created',
+            auditable: $category,
+            newValues: $category->only(['name', 'description']),
+            description: 'Category created by admin.'
+        );
 
         return redirect()->route('categories.index')
             ->with('success', 'Category created successfully!');
@@ -54,11 +63,20 @@ class CategoryController extends Controller
         $this->authorize('update', $category);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:categories,name,' . $category->id,
+            'name' => 'required|string|max:255|unique:categories,name,'.$category->id,
             'description' => 'nullable|string',
         ]);
 
+        $before = $category->only(['name', 'description']);
         $category->update($validated);
+
+        AuditLogger::log(
+            action: 'category.updated',
+            auditable: $category,
+            oldValues: $before,
+            newValues: $category->only(['name', 'description']),
+            description: 'Category updated by admin.'
+        );
 
         return redirect()->route('categories.index')
             ->with('success', 'Category updated successfully!');
@@ -68,7 +86,14 @@ class CategoryController extends Controller
     {
         $this->authorize('delete', $category);
 
+        $snapshot = $category->only(['name', 'description']);
         $category->delete();
+
+        AuditLogger::log(
+            action: 'category.deleted',
+            oldValues: $snapshot,
+            description: 'Category deleted by admin.'
+        );
 
         return redirect()->route('categories.index')
             ->with('success', 'Category deleted successfully!');

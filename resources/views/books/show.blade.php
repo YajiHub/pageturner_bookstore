@@ -3,6 +3,13 @@
 @section('title', $book->title . ' - PageTurner')
 
 @section('content')
+<div class="mb-4 flex items-center gap-3">
+    <a href="{{ route('books.index') }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">
+        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        Back to Books
+    </a>
+</div>
+
 <div class="bg-white rounded-lg shadow-lg overflow-hidden">
     <div class="md:flex">
         {{-- Book Cover --}}
@@ -32,7 +39,7 @@
                 <span class="ml-2 text-gray-600">{{ number_format($book->average_rating, 1) }} ({{ $book->reviews->count() }} reviews)</span>
             </div>
 
-            <p class="text-3xl font-bold text-indigo-600 mt-4">${{ number_format($book->price, 2) }}</p>
+            <p class="text-3xl font-bold text-indigo-600 mt-4">₱{{ number_format($book->price, 2) }}</p>
 
             <div class="mt-4">
                 <span class="text-sm {{ $book->stock_quantity > 0 ? 'text-green-600' : 'text-red-600' }}">
@@ -51,36 +58,44 @@
             <div class="mt-6">
                 <h3 class="font-semibold text-gray-800">Description</h3>
                 <p class="text-gray-600 mt-2">{{ $book->description }}</p>
-                @auth
-                    @if($book->stock_quantity > 0)
-                            @unless(auth()->check() && auth()->user()->isAdmin())
-                                <div class="mt-4 flex items-center gap-3">
-                                    <form action="{{ route('cart.add', $book) }}" method="POST">
-                                        @csrf
-                                        <button type="submit" class="bg-gray-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                            Add to Cart
-                                        </button>
-                                    </form>
+                @if($book->stock_quantity > 0)
+                    @auth
+                        @unless(auth()->user()->isAdmin())
+                            <div class="mt-4 flex items-center gap-3">
+                                <form action="{{ route('cart.add', $book) }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="bg-gray-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                                        Add to Cart
+                                    </button>
+                                </form>
 
-                                    <form action="{{ route('orders.store') }}" method="POST">
-                                        @csrf
-                                        <input type="hidden" name="book_id" value="{{ $book->id }}">
-                                        <button type="submit" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium">
-                                            Buy Now
-                                        </button>
-                                    </form>
+                                <form action="{{ route('orders.store') }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="book_id" value="{{ $book->id }}">
+                                    <button type="submit" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium">
+                                        Buy Now
+                                    </button>
+                                </form>
 
-                                    @if($hasPurchased)
-                                        <span class="ml-4 text-green-600 text-sm">✓ You own this book</span>
-                                    @endif
-                                </div>
-                            @endunless
+                                @if($hasPurchased)
+                                    <span class="ml-4 text-green-600 text-sm">✓ You own this book</span>
+                                @endif
+                            </div>
+                        @endunless
                     @else
-                        <button disabled class="bg-gray-400 text-white px-3 py-2 rounded-md text-sm cursor-not-allowed">Out of Stock</button>
-                    @endif
+                        <div class="mt-4 flex items-center gap-3">
+                            <form action="{{ route('cart.add', $book) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="bg-gray-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                                    Add to Cart
+                                </button>
+                            </form>
+                            <a href="{{ route('login') }}" class="text-sm text-indigo-600 hover:text-indigo-800">Sign in to checkout</a>
+                        </div>
+                    @endauth
                 @else
-                    <a href="{{ route('login') }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium">Login to Order</a>
-                @endauth
+                    <button disabled class="bg-gray-400 text-white px-3 py-2 rounded-md text-sm cursor-not-allowed">Out of Stock</button>
+                @endif
             </div>
 
             {{-- Admin Actions --}}
@@ -112,7 +127,7 @@
     @auth
         @if($hasPurchased)
             <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <h3 class="font-semibold text-lg mb-4">Write a Review</h3>
+                <h3 class="font-semibold text-lg mb-4">{{ $userReview ? 'Edit Your Review' : 'Write a Review' }}</h3>
                 <form action="{{ route('reviews.store', $book) }}" method="POST">
                     @csrf
                     <div class="mb-4">
@@ -120,18 +135,27 @@
                         <select name="rating" class="border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                             <option value="">Select rating</option>
                             @for($i = 5; $i >= 1; $i--)
-                                <option value="{{ $i }}">{{ $i }} Star{{ $i > 1 ? 's' : '' }}</option>
+                                <option value="{{ $i }}" {{ (int) old('rating', $userReview?->rating) === $i ? 'selected' : '' }}>{{ $i }} Star{{ $i > 1 ? 's' : '' }}</option>
                             @endfor
                         </select>
                     </div>
                     <div class="mb-4">
                         <label class="block text-gray-700 mb-2">Comment</label>
-                        <textarea name="comment" rows="4" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Share your thoughts about this book..."></textarea>
+                        <textarea name="comment" rows="4" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Share your thoughts about this book...">{{ old('comment', $userReview?->comment) }}</textarea>
                     </div>
-                    <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition">
-                        Submit Review
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition">
+                            {{ $userReview ? 'Update Review' : 'Submit Review' }}
+                        </button>
+                    </div>
                 </form>
+                @if($userReview)
+                    <form action="{{ route('reviews.destroy', $userReview) }}" method="POST" onsubmit="return confirm('Delete your review?');" class="mt-3">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-red-600 hover:text-red-700 text-sm font-medium">Delete Review</button>
+                    </form>
+                @endif
             </div>
         @else
             @unless(auth()->user()->isAdmin())

@@ -11,9 +11,7 @@ class NewReviewAdminNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public Review $review)
-    {
-    }
+    public function __construct(public Review $review) {}
 
     public function via(object $notifiable): array
     {
@@ -23,12 +21,12 @@ class NewReviewAdminNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('New Review Submitted for "' . $this->review->book->title . '"')
+            ->subject('New Review Submitted for "'.$this->review->book->title.'"')
             ->greeting('Hello Admin!')
-            ->line($this->review->user->name . ' submitted a review for "' . $this->review->book->title . '".')
-            ->line('Rating: ' . $this->review->rating . '/5')
-            ->line('Comment: ' . ($this->review->comment ?: 'No comment'))
-            ->action('View Book', url('/books/' . $this->review->book_id))
+            ->line($this->review->user->name.' submitted a review for "'.$this->review->book->title.'".')
+            ->line('Rating: '.$this->review->rating.'/5')
+            ->line('Comment: '.($this->review->comment ?: 'No comment'))
+            ->action('View Book', url('/books/'.$this->review->book_id))
             ->line('Please review this submission.');
     }
 
@@ -36,7 +34,7 @@ class NewReviewAdminNotification extends Notification
     {
         return [
             'review_id' => $this->review->id,
-            'message' => $this->review->user->name . ' reviewed "' . $this->review->book->title . '" (' . $this->review->rating . '/5)',
+            'message' => $this->review->user->name.' reviewed "'.$this->review->book->title.'" ('.$this->review->rating.'/5)',
             'book_title' => $this->review->book->title,
             'reviewer_name' => $this->review->user->name,
             'rating' => $this->review->rating,

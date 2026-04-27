@@ -10,9 +10,7 @@ class TwoFactorCodeNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(public string $code)
-    {
-    }
+    public function __construct(public string $code) {}
 
     public function via(object $notifiable): array
     {
@@ -23,9 +21,9 @@ class TwoFactorCodeNotification extends Notification
     {
         return (new MailMessage)
             ->subject('Your Two-Factor Authentication Code - PageTurner')
-            ->greeting('Hello ' . $notifiable->name . '!')
+            ->greeting('Hello '.$notifiable->name.'!')
             ->line('Your two-factor authentication code is:')
-            ->line('**' . $this->code . '**')
+            ->line('**'.$this->code.'**')
             ->line('This code will expire in 10 minutes.')
             ->line('If you did not request this code, please secure your account immediately.');
     }

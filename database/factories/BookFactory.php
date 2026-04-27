@@ -1,8 +1,8 @@
 <?php
 
 namespace Database\Factories;
-use App\Models\Category;
 
+use App\Models\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\File;
 
@@ -17,7 +17,7 @@ class BookFactory extends Factory
      * @return array<string, mixed>
      */
     public function definition(): array
-    {  
+    {
         $titles = [
             'The Silent Observer', 'Midnight in the Garden', 'Beyond the Horizon',
             'The Last Chapter', 'Whispers of Time', 'The Golden Thread',
@@ -41,7 +41,7 @@ class BookFactory extends Factory
         ];
 
         $coverFiles = collect(File::files(storage_path('app/public/covers')))
-            ->map(fn ($file) => 'covers/' . $file->getFilename())
+            ->map(fn ($file) => 'covers/'.$file->getFilename())
             ->values()
             ->toArray();
 
@@ -50,10 +50,10 @@ class BookFactory extends Factory
             'title' => fake()->unique()->randomElement($titles),
             'author' => fake('en_US')->name(),
             'isbn' => fake()->unique()->isbn13(),
-            'price' => fake()->randomFloat(2, 9.99, 49.99),
+            'price' => fake()->randomFloat(2, 150.00, 1999.99),
             'stock_quantity' => fake()->numberBetween(5, 50),
             'description' => fake()->randomElement($descriptions),
-            'cover_image' => !empty($coverFiles) ? fake()->randomElement($coverFiles) : null,
+            'cover_image' => ! empty($coverFiles) ? fake()->randomElement($coverFiles) : null,
         ];
     }
 }
