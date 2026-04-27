@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerDashboardController;
@@ -76,6 +77,12 @@ Route::middleware(['auth', 'verified', 'admin', 'normalize.input', 'throttle:adm
     // Admin Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/transfer-jobs/progress', [AdminDashboardController::class, 'transferJobsProgress'])->name('transfer-jobs.progress');
+    
+    // Backups Management
+    Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+    Route::get('/backups/{file_name}/download', [BackupController::class, 'download'])->name('backups.download');
+    
+    // Audit Logs
     Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::get('/audit-logs/export', [AuditLogController::class, 'export'])->name('audit-logs.export');
     Route::post('/audit-logs/archive', [AuditLogController::class, 'archive'])->name('audit-logs.archive');

@@ -2,7 +2,6 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex items-center">
-                <!-- Logo -->
                 @auth
                     @if(auth()->user()->isAdmin())
                         <a href="{{ route('admin.dashboard') }}" class="text-xl font-bold">
@@ -20,31 +19,43 @@
                     </a>
                 @endguest
 
-                <!-- Navigation Links -->
-                <div class="hidden md:flex ml-10 space-x-4">
-                    <a href="{{ route('home') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">
-                        Home
-                    </a>
-                    <a href="{{ route('books.index') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">
-                        Books
-                    </a>
-                    <a href="{{ route('categories.index') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">
-                        Categories
-                    </a>
+                <div class="hidden md:flex ml-10 space-x-4 items-center z-50">
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                        <button @click="open = !open" class="hover:bg-gray-700 px-3 py-2 rounded-md inline-flex items-center text-sm font-medium transition-colors">
+                            Storefront
+                            <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                        <div x-show="open" x-transition class="absolute left-0 mt-2 w-48 rounded-md bg-white shadow-lg border border-gray-100" style="display:none;">
+                            <div class="py-1">
+                                <a href="{{ route('home') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Home</a>
+                                <a href="{{ route('books.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Books</a>
+                                <a href="{{ route('categories.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Categories</a>
+                            </div>
+                        </div>
+                    </div>
 
                     @auth
                         @if(auth()->user()->isAdmin())
-                            <a href="{{ route('admin.dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md {{ request()->routeIs('admin.dashboard') ? 'bg-gray-900' : '' }}">
+                            <a href="{{ route('admin.dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('admin.dashboard') ? 'bg-gray-900' : '' }}">
                                 Dashboard
                             </a>
-                            <a href="{{ route('admin.books.create') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">
-                                Add Book
-                            </a>
-                            <a href="{{ route('admin.categories.create') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">
-                                Add Category
-                            </a>
+                            
+                            <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                <button @click="open = !open" class="hover:bg-gray-700 px-3 py-2 rounded-md inline-flex items-center text-sm font-medium transition-colors">
+                                    Manage Catalog
+                                    <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                                <div x-show="open" x-transition class="absolute left-0 mt-2 w-48 rounded-md bg-white shadow-lg border border-gray-100" style="display:none;">
+                                    <div class="py-1">
+                                        <a href="{{ route('admin.books.create') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Book</a>
+                                        <a href="{{ route('admin.categories.create') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Add Category</a>
+                                        <div class="border-t border-gray-100 my-1"></div>
+                                        <a href="{{ route('admin.backups.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">System Backups</a>
+                                    </div>
+                                </div>
+                            </div>
                         @else
-                            <a href="{{ route('dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md {{ request()->routeIs('dashboard') ? 'bg-gray-900' : '' }}">
+                            <a href="{{ route('dashboard') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('dashboard') ? 'bg-gray-900' : '' }}">
                                 My Account
                             </a>
                         @endif
@@ -52,7 +63,6 @@
                 </div>
             </div>
 
-            <!-- Right Side -->
             <div class="flex items-center space-x-4">
                 @guest
                     <a href="{{ route('login') }}" class="hover:bg-gray-700 px-3 py-2 rounded-md">

@@ -7,7 +7,6 @@
 @endsection
 
 @section('content')
-    <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="bg-white rounded-lg shadow p-6">
             <div class="flex items-center">
@@ -95,7 +94,6 @@
         </div>
     </div>
 
-    <!-- Advanced Insights -->
     <div id="overview-insights" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-28">
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Sales Performance</h3>
@@ -162,8 +160,9 @@
         </div>
 
         <div class="bg-white rounded-lg shadow p-6">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Selling Books</h3>
-            <div class="space-y-2">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Top Selling Books Analytics</h3>
+            <canvas id="topSellingChart" height="180"></canvas>
+            <div class="space-y-2 mt-4 hidden">
                 @forelse($topSellingBooks as $book)
                     <div class="p-2 rounded bg-gray-50 border border-gray-100">
                         <div class="flex items-center justify-between">
@@ -179,7 +178,6 @@
         </div>
     </div>
 
-    <!-- Order Status Summary -->
     <div id="quick-actions" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 scroll-mt-28">
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Order Status Summary</h3>
@@ -215,7 +213,6 @@
             </div>
         </div>
 
-        <!-- Quick Links -->
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">Quick Links</h3>
             <div class="grid grid-cols-2 gap-3">
@@ -262,11 +259,16 @@
                     </svg>
                     <span class="text-sm font-medium text-amber-700">Audit Logs</span>
                 </a>
+                <a href="{{ route('admin.backups.index') }}" class="flex items-center p-3 bg-teal-50 rounded-lg hover:bg-teal-100 transition">
+                    <svg class="w-5 h-5 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                    </svg>
+                    <span class="text-sm font-medium text-teal-700">System Backups</span>
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Data Management -->
     <div id="data-management" class="bg-white rounded-lg shadow mb-8 scroll-mt-28">
         <div class="p-6 border-b">
             <h3 class="text-lg font-semibold text-gray-800">System Data Management</h3>
@@ -544,7 +546,6 @@
         </div>
     </div>
 
-    <!-- Recent Orders -->
     <div id="recent-orders" class="bg-white rounded-lg shadow mb-8 scroll-mt-28">
         <div class="p-6 border-b">
             <div class="flex justify-between items-center">
@@ -598,7 +599,6 @@
         </div>
     </div>
 
-    <!-- Recent Reviews -->
     <div id="recent-reviews" class="bg-white rounded-lg shadow scroll-mt-28">
         <div class="p-6 border-b">
             <h3 class="text-lg font-semibold text-gray-800">Recent Reviews</h3>
@@ -630,3 +630,36 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('topSellingChart').getContext('2d');
+        const chartData = {!! json_encode($topSellingBooks) !!};
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: chartData.map(book => book.title),
+                datasets: [{
+                    label: 'Units Sold',
+                    data: chartData.map(book => book.total_units),
+                    backgroundColor: 'rgba(79, 70, 229, 0.5)',
+                    borderColor: 'rgba(79, 70, 229, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    });
+</script>
+@endpush

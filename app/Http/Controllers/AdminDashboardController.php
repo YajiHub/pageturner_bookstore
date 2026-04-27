@@ -66,7 +66,9 @@ class AdminDashboardController extends Controller
             ],
         ];
 
-        $lowStockThreshold = 5;
+        // Make threshold dynamic via env, falling back to 5
+        $lowStockThreshold = config('app.low_stock_threshold', env('LOW_STOCK_THRESHOLD', 5));
+        
         $lowStockBooks = Book::query()
             ->where('stock_quantity', '<=', $lowStockThreshold)
             ->orderBy('stock_quantity')
@@ -245,4 +247,4 @@ class AdminDashboardController extends Controller
             default => route('admin.books.export.download', $transfer),
         };
     }
-}
+}   
