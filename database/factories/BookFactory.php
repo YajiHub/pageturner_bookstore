@@ -2,58 +2,73 @@
 
 namespace Database\Factories;
 
+use App\Models\Book;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\File;
 
-/**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Book>
- */
 class BookFactory extends Factory
 {
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected $model = Book::class;
+
+    // Cache Category IDs to avoid 1 Million DB Lookups
+    protected static array $categoryIds = [];
+    protected static array $publishers = [
+        'Penguin Random House', 'HarperCollins', 'Simon & Schuster', 'Hachette Livre',
+        'Macmillan Publishers', 'Scholastic', 'Pearson', 'McGraw-Hill', 'Oxford University Press',
+        'Wiley', 'Springer Nature', 'Cengage', 'Bloomsbury', 'Routledge', 'Elsevier'
+    ];
+    protected static array $formats = ['Hardcover', 'Paperback', 'E-book', 'Audiobook'];
+
     public function definition(): array
     {
-        $titles = [
-            'The Silent Observer', 'Midnight in the Garden', 'Beyond the Horizon',
-            'The Last Chapter', 'Whispers of Time', 'The Golden Thread',
-            'A World Apart', 'The Hidden Path', 'Echoes of Tomorrow',
-            'The Iron Gate', 'Under Crimson Skies', 'The Forgotten Letter',
-            'Dancing with Shadows', 'The Lighthouse Keeper', 'Broken Wings',
-            'The Winter Rose', 'Tides of Fortune', 'The Glass Castle',
-            'Starlight and Ashes', 'The Wanderer Returns', 'Lost in Translation',
-            'The Secret Garden Club', 'Rivers of Gold', 'The Final Curtain',
-            'Between Two Worlds', 'The Paper Trail', 'Shattered Dreams',
-            'The Morning Star', 'Voices in the Wind', 'The Clockmaker',
-        ];
+        if (empty(self::$categoryIds)) {
+            self::$categoryIds = Category::pluck('id')->toArray();
+            if (empty(self::$categoryIds)) {
+                self::$categoryIds = [1, 2, 3, 4, 5]; // Fallback if no categories exist
+            }
+        }
 
-        $descriptions = [
-            'A captivating story that takes readers on an unforgettable journey through love, loss, and redemption. This beautifully written novel explores the depths of human emotion and the power of second chances.',
-            'An enthralling tale of adventure and discovery that will keep you turning pages long into the night. Set against a backdrop of stunning landscapes and rich characters.',
-            'A thought-provoking exploration of what it means to be human in a rapidly changing world. This book challenges readers to see beyond the ordinary and embrace the extraordinary.',
-            'A masterfully crafted narrative that weaves together multiple timelines and perspectives into a rich tapestry of storytelling. Every chapter reveals new layers of meaning.',
-            'A heartwarming story about family, friendship, and the bonds that hold us together through the most challenging times. Perfect for readers who love emotional depth.',
-            'A gripping thriller that keeps you guessing until the very last page. Full of twists, turns, and unexpected revelations that will leave you breathless.',
-        ];
-
-        $coverFiles = collect(File::files(storage_path('app/public/covers')))
-            ->map(fn ($file) => 'covers/'.$file->getFilename())
-            ->values()
-            ->toArray();
+        $format = $this->faker->randomElement(self::$formats);
+        $basePrice = match ($format) {
+            'Hardcover' => $this->faker->randomFloat(2, 20, 50),
+            'Paperback' => $this->faker->randomFloat(2, 10, 25),
+            'E-book'    => $this->faker->randomFloat(2, 5, 15),
+            'Audiobook' => $this->faker->randomFloat(2, 15, 30),
+            default     => 15.99,
+        };
 
         return [
-            'category_id' => Category::factory(),
-            'title' => fake()->unique()->randomElement($titles),
-            'author' => fake('en_US')->name(),
-            'isbn' => fake()->unique()->isbn13(),
-            'price' => fake()->randomFloat(2, 150.00, 1999.99),
-            'stock_quantity' => fake()->numberBetween(5, 50),
-            'description' => fake()->randomElement($descriptions),
-            'cover_image' => ! empty($coverFiles) ? fake()->randomElement($coverFiles) : null,
+            'isbn'           => $this->generateValidIsbn13(),
+            'title'          => $this->faker->unique()->sentence(rand(2, 6)),
+            'author'         => $this->faker->name(),
+            'publisher'      => $this->faker->randomElement(self::$publishers),
+            'description'    => $this->faker->paragraph(rand(2, 4)),
+            'price'          => $basePrice,
+            'stock_quantity' => $this->faker->numberBetween(0, 1000),
+            'category_id'    => $this->faker->randomElement(self::$categoryIds),
+            'format'         => $format,
+            'published_at'   => $this->faker->dateTimeBetween('-30 years', 'now')->format('Y-m-d'),
+            'is_active'      => $this->faker->boolean(85), // 85% active
+            'created_at'     => now(),
+            'updated_at'     => now(),
         ];
+    }
+
+    private function generateValidIsbn13(): string
+    {
+        $prefix = '978';
+        $group = str_pad(rand(0, 99), 2, '0', STR_PAD_LEFT);
+        $publisher = str_pad(rand(0, 9999), 4, '0', STR_PAD_LEFT);
+        $title = str_pad(rand(0, 999), 3, '0', STR_PAD_LEFT);
+        
+        $isbn12 = $prefix . $group . $publisher . $title;
+        $sum = 0;
+        
+        for ($i = 0; $i < 12; $i++) {
+            $sum += (int)$isbn12[$i] * ($i % 2 === 0 ? 1 : 3);
+        }
+        
+        $checkDigit = (10 - ($sum % 10)) % 10;
+        return $isbn12 . $checkDigit;
     }
 }

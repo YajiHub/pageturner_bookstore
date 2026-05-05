@@ -5,10 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Models\Traits\Shardable;
+use Laravel\Scout\Searchable;
+
 class Book extends Model
 {
     //
     use HasFactory;
+
+    use Searchable, Shardable;
 
     protected $fillable = [
         'category_id',
@@ -20,6 +25,23 @@ class Book extends Model
         'description',
         'cover_image',
     ];
+
+    public function toSearchableArray(): array
+    {
+        return [
+            'id'          => $this->id,
+            'title'       => $this->title,
+            'author'      => $this->author,
+            'publisher'   => $this->publisher,
+            'description' => $this->description,
+            'category'    => $this->category?->name,
+            'format'      => $this->format,
+        ];
+    }
+    public function shouldBeSearchable(): bool
+    {
+        return clone $this->is_active;
+    }
 
     public function category()
     {
