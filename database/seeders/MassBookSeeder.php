@@ -8,16 +8,18 @@ use Illuminate\Support\Facades\DB;
 
 class MassBookSeeder extends Seeder
 {
-    private const CHUNK_SIZE = 5000; // Optimal batch size for MySQL
-    private const TOTAL_RECORDS = 1000000;
+    private const CHUNK_SIZE = 5000; // Optimal batch size for PostgreSQL
 
     public function run(): void
     {
-        $this->command->info('Starting mass book seeding (1 Million Records)...');
+        // Dynamically fetch the record count from .env, fallback to 1M if missing
+        $totalRecords = (int) env('SEED_BOOKS_COUNT', 1000000);
+        
+        $this->command->info("Starting mass book seeding ({$totalRecords} Records)...");
         $inserted = 0;
 
-        while ($inserted < self::TOTAL_RECORDS) {
-            $batchSize = min(self::CHUNK_SIZE, self::TOTAL_RECORDS - $inserted);
+        while ($inserted < $totalRecords) {
+            $batchSize = min(self::CHUNK_SIZE, $totalRecords - $inserted);
 
             // make() generates arrays WITHOUT instantiating bloated Eloquent objects
             $books = Book::factory()->count($batchSize)->make()->toArray();
@@ -31,10 +33,10 @@ class MassBookSeeder extends Seeder
             if ($inserted % (self::CHUNK_SIZE * 10) === 0) {
                 unset($books);
                 gc_collect_cycles();
-                $this->command->info("Inserted {$inserted} books...");
+                $this->command->info("Inserted " . number_format($inserted) . " books...");
             }
         }
         
-        $this->command->info('Successfully seeded ' . self::TOTAL_RECORDS . ' books!');
+        $this->command->info('Successfully seeded ' . number_format($totalRecords) . ' books!');
     }
 }
