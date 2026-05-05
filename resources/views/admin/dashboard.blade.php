@@ -86,11 +86,10 @@
         <div class="bg-white/95 backdrop-blur border border-slate-200 rounded-lg shadow px-3 py-2 flex flex-wrap gap-2 text-xs sm:text-sm">
             <a href="#overview-insights" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Overview</a>
             <a href="#quick-actions" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Quick Actions</a>
+            <a href="#system-observability" class="px-3 py-1.5 rounded-md bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-medium">Observability</a>
             <a href="#data-management" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Data Management</a>
             <a href="#transfer-jobs" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Transfer Jobs</a>
             <a href="#recent-audit" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Audit Logs</a>
-            <a href="#recent-orders" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Orders</a>
-            <a href="#recent-reviews" class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700">Reviews</a>
         </div>
     </div>
 
@@ -140,6 +139,79 @@
                 Stalled processing jobs (&gt;90m): <span class="font-semibold">{{ number_format($transferHealth['stalled_processing']) }}</span>
             </div>
         </div>
+    </div>
+
+    <div id="system-observability" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 scroll-mt-28">
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">System Health</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-sm text-gray-600">Database Size</span>
+                    <span class="font-semibold text-gray-800">{{ $systemHealth['database_size'] }}</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-sm text-gray-600">Storage Usage</span>
+                    <span class="font-semibold text-gray-800">{{ $systemHealth['storage_usage_percent'] }} ({{ $systemHealth['free_space_gb'] }} free)</span>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <span class="text-sm text-gray-600">Failed Queue Jobs</span>
+                    <span class="font-semibold {{ $systemHealth['failed_jobs'] > 0 ? 'text-red-600' : 'text-green-600' }}">{{ $systemHealth['failed_jobs'] }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">Current Queue Length</span>
+                    <span class="font-semibold text-blue-600">{{ $systemHealth['queue_length'] }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">API Usage Statistics</h3>
+            <div class="flex justify-between items-center mb-3">
+                <span class="text-sm text-gray-600">Total Requests:</span>
+                <span class="font-semibold text-gray-800">{{ number_format($apiUsage['total_requests']) }}</span>
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-sm text-gray-600">Rate Limit Throttles:</span>
+                <span class="font-semibold text-red-600">{{ number_format($apiUsage['rate_limit_hits']) }}</span>
+            </div>
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Top Hit Endpoints</h4>
+            <div class="space-y-2">
+                @foreach($apiUsage['endpoints'] as $ep)
+                <div class="flex justify-between items-center text-sm bg-gray-50 p-2 rounded">
+                    <span class="text-indigo-600 font-mono text-xs">{{ is_array($ep) ? $ep['endpoint'] : $ep->endpoint }}</span>
+                    <span class="text-gray-700">{{ number_format(is_array($ep) ? $ep['hits'] : $ep->hits) }}</span>
+                </div>
+                @endforeach
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Backup Status</h3>
+            <div class="flex flex-col items-center justify-center mb-4">
+                <div class="w-16 h-16 rounded-full {{ $backupStatus['health'] === 'Healthy' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600' }} flex items-center justify-center mb-2">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <span class="font-semibold text-lg {{ $backupStatus['health'] === 'Healthy' ? 'text-green-700' : 'text-red-700' }}">{{ $backupStatus['health'] }}</span>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-600">Last Verified Backup:</span>
+                    <span class="font-medium text-gray-800">{{ \Carbon\Carbon::parse($backupStatus['last_backup_time'])->diffForHumans() }}</span>
+                </div>
+                <div class="flex justify-between border-b pb-2">
+                    <span class="text-gray-600">Avg. Archive Size:</span>
+                    <span class="font-medium text-gray-800">{{ $backupStatus['size'] }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Storage Destination:</span>
+                    <span class="font-medium text-gray-800 uppercase">{{ $backupStatus['location'] }}</span>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

@@ -2,9 +2,13 @@
 
 use App\Models\AuditLog;
 use App\Models\DataTransferJob;
+use App\Models\Order;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -207,13 +211,105 @@ Artisan::command('maintenance:verify-audit-chain {--days=30}', function () {
     $this->info("Audit checksum verification complete. Invalid entries: {$invalidCount}");
 })->purpose('Verify audit checksum chain for recent entries and log anomalies.');
 
-// Lab 6: Automated backup lifecycle for enterprise data management.
+// ===============================================================
+// LAB 6 NEW AUTOMATED TASKS
+// ===============================================================
+
+Artisan::command('order:cleanup-pending', function () {
+    $cutoff = now()->subHours(24);
+    $count = Order::where('status', 'pending')->where('created_at', '<', $cutoff)->update(['status' => 'cancelled']);
+    $this->info("Cancelled {$count} pending orders older than 24 hours.");
+})->purpose('Cancel pending orders > 24 hours old');
+
+Artisan::command('session:cleanup', function () {
+    if (config('session.driver') === 'database' && Schema::hasTable(config('session.table'))) {
+        $lifetime = config('session.lifetime') * 60;
+        $deleted = DB::table(config('session.table'))->where('last_activity', '<', time() - $lifetime)->delete();
+        $this->info("Cleared {$deleted} expired sessions from database.");
+    } else {
+        $this->info('Session driver is not database or table is missing. Handled by native garbage collection.');
+    }
+})->purpose('Clear expired sessions');
+
+Artisan::command('log:rotate', function () {
+    $logPath = storage_path('logs/laravel.log');
+    if (file_exists($logPath)) {
+        $archiveName = 'laravel-' . date('Y-m-d-His') . '.log';
+        $archivePath = storage_path('logs/' . $archiveName);
+        rename($logPath, $archivePath);
+
+        if (class_exists('ZipArchive')) {
+            $zip = new ZipArchive();
+            $zipPath = $archivePath . '.zip';
+            if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+                $zip->addFile($archivePath, $archiveName);
+                $zip->close();
+                unlink($archivePath); 
+            }
+        }
+        $this->info('Rotated and compressed laravel.log');
+    } else {
+        $this->info('No laravel.log found to rotate.');
+    }
+})->purpose('Archive and compress old logs');
+
+Artisan::command('report:generate-daily', function () {
+    $yesterday = now()->subDay()->toDateString();
+    $sales = Order::where('status', 'completed')->whereDate('updated_at', $yesterday)->sum('total_amount');
+    $count = Order::where('status', 'completed')->whereDate('updated_at', $yesterday)->count();
+
+    $admins = User::where('role', 'admin')->pluck('email')->toArray();
+    if (!empty($admins)) {
+        $formattedSales = number_format($sales, 2);
+        Mail::raw("Daily Sales Report for {$yesterday}:\n\nTotal Completed Orders: {$count}\nTotal Revenue: Php {$formattedSales}", function ($message) use ($admins, $yesterday) {
+            $message->to($admins)->subject("Daily Sales Report - {$yesterday}");
+        });
+    }
+    $this->info("Daily sales report generated and emailed to admins.");
+})->purpose('Generate daily sales report');
+
+Artisan::command('notification:prune', function () {
+    if (Schema::hasTable('notifications')) {
+        $count = DB::table('notifications')->where('created_at', '<', now()->subDays(90))->delete();
+        $this->info("Deleted {$count} old notifications.");
+    } else {
+        $this->info("Notifications table does not exist.");
+    }
+})->purpose('Delete old notification records > 90 days');
+
+Artisan::command('audit:archive', function () {
+    $cutoff = now()->subYear();
+    $logs = AuditLog::where('created_at', '<', $cutoff)->get();
+    
+    if ($logs->count() > 0) {
+        $csv = "id,action,user_id,created_at\n";
+        foreach ($logs as $log) {
+            $csv .= "{$log->id},{$log->action},{$log->user_id},{$log->created_at}\n";
+        }
+        Storage::disk('local')->put('archives/audit-logs-' . now()->format('Y-m-d') . '.csv', $csv);
+        AuditLog::where('created_at', '<', $cutoff)->delete();
+    }
+    $this->info("Archived {$logs->count()} audit logs older than 1 year to CSV.");
+})->purpose('Archive audit logs > 1 year old');
+
+
+// ===============================================================
+// LAB 6 SCHEDULER
+// ===============================================================
+
 Schedule::command('backup:run --only-db')->dailyAt('01:00')->withoutOverlapping();
 Schedule::command('backup:run --only-files')->dailyAt('01:30')->withoutOverlapping();
 Schedule::command('backup:clean')->dailyAt('02:00')->withoutOverlapping();
 Schedule::command('backup:monitor')->hourly()->withoutOverlapping();
 
-// Lab 6: Scheduled operational maintenance tasks.
+// Lab 6: Scheduled operational maintenance tasks (Rubric Requirements)
+Schedule::command('order:cleanup-pending')->hourly()->withoutOverlapping();
+Schedule::command('session:cleanup')->daily()->withoutOverlapping();
+Schedule::command('log:rotate')->weekly()->withoutOverlapping();
+Schedule::command('report:generate-daily')->dailyAt('06:00')->withoutOverlapping();
+Schedule::command('notification:prune')->weekly()->withoutOverlapping();
+Schedule::command('audit:archive')->monthly()->withoutOverlapping();
+
 Schedule::command('maintenance:cleanup-transfer-files --hours='.env('MAINTENANCE_TRANSFER_FILE_RETENTION_HOURS', 48))
     ->dailyAt('02:30')
     ->withoutOverlapping();
