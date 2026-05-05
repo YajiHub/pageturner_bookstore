@@ -56,11 +56,9 @@ class ProcessBooksImportJob implements ShouldQueue
         }
 
         try {
-            // NATIVE HIGH-SPEED PROCESSING FOR CSV
             if ($extension === 'csv') {
                 $this->processNativeCsv($fullPath, $transfer, $importLog, $duplicateStrategy);
             } 
-            // LARAVEL EXCEL FALLBACK FOR XLSX
             else {
                 $readerType = $transfer->options['reader_type'] ?? null;
                 $import = new BooksImport($duplicateStrategy, $transfer->id, (int) ($transfer->total_rows ?? 0));
@@ -112,9 +110,10 @@ class ProcessBooksImportJob implements ShouldQueue
 
         $headers = fgetcsv($handle);
         if (isset($headers[0])) { $headers[0] = preg_replace('/^[\xef\xbb\xbf]+/', '', $headers[0]); } // Strip BOM
-        $headerMap = array_flip(array_map(fn($h) => strtolower(trim($h)), $headers));
+        
+        // FIXED: Convert header spaces to underscores natively (e.g. "Category ID" -> "category_id")
+        $headerMap = array_flip(array_map(fn($h) => str_replace(' ', '_', strtolower(trim($h))), $headers));
 
-        // Column Index Mapping
         $colIdx = [
             'title' => $headerMap['title'] ?? null,
             'author' => $headerMap['author'] ?? null,
@@ -126,7 +125,6 @@ class ProcessBooksImportJob implements ShouldQueue
             'category_name' => $headerMap['category'] ?? $headerMap['category_name'] ?? null,
         ];
 
-        // O(1) memory lookup caching to avoid 1M database queries
         $categoryMap = Category::pluck('id', 'name')->mapWithKeys(fn($id, $name) => [mb_strtolower(trim($name)) => $id])->toArray();
         $categoryIdMap = Category::pluck('id', 'id')->toArray();
 
@@ -138,7 +136,7 @@ class ProcessBooksImportJob implements ShouldQueue
         $now = now()->format('Y-m-d H:i:s');
 
         while (($row = fgetcsv($handle)) !== false) {
-            if (empty(array_filter($row))) continue; // Skip empty rows
+            if (empty(array_filter($row))) continue; 
 
             $title = $row[$colIdx['title']] ?? null;
             $isbn = $row[$colIdx['isbn']] ?? null;
@@ -147,7 +145,6 @@ class ProcessBooksImportJob implements ShouldQueue
 
             $isbn = preg_replace('/[^0-9Xx]/', '', trim((string) $isbn));
             
-            // Resolve Category extremely fast
             $catId = null;
             if ($colIdx['category_id'] !== null && isset($row[$colIdx['category_id']], $categoryIdMap[(int)$row[$colIdx['category_id']]])) {
                 $catId = (int) $row[$colIdx['category_id']];
@@ -172,7 +169,6 @@ class ProcessBooksImportJob implements ShouldQueue
 
             $processed++;
 
-            // Batch Execute Native DB Query for extreme performance
             if (count($batch) >= $batchSize) {
                 if ($duplicateStrategy === 'update') {
                     DB::table('books')->upsert($batch, ['isbn'], ['category_id', 'title', 'author', 'price', 'stock_quantity', 'description', 'updated_at']);
@@ -185,7 +181,6 @@ class ProcessBooksImportJob implements ShouldQueue
             }
         }
 
-        // Process remaining rows in batch array
         if (count($batch) > 0) {
             if ($duplicateStrategy === 'update') {
                 DB::table('books')->upsert($batch, ['isbn'], ['category_id', 'title', 'author', 'price', 'stock_quantity', 'description', 'updated_at']);

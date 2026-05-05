@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exports\BooksExport;
+use App\Jobs\ProcessBooksExportJob;
 use App\Jobs\ProcessBooksImportJob;
-use App\Jobs\QueuedBooksExportJob;
 use App\Models\Book;
 use App\Models\Category;
 use App\Models\DataTransferJob;
@@ -270,11 +270,20 @@ class BookController extends Controller
     {
         $this->authorize('create', Book::class);
 
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv|max:10240', // 10MB max
-        ]);
+        if (!$request->hasFile('file')) {
+            return redirect()->route('admin.dashboard')->with('error', 'Upload failed. The file is too large and exceeds your PHP post_max_size limit. Please update php.ini.');
+        }
 
         $file = $request->file('file');
+
+        if (!$file->isValid()) {
+            return redirect()->route('admin.dashboard')->with('error', 'Upload failed: ' . $file->getErrorMessage() . '. Please increase upload_max_filesize in your php.ini.');
+        }
+
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv|max:512000', 
+        ]);
+
         $originalName = $file->getClientOriginalName();
         $path = $file->store('imports', 'local');
         $fullPath = Storage::disk('local')->path($path);
@@ -284,41 +293,49 @@ class BookController extends Controller
         $dataRows = [];
         $recordCount = 0;
 
-        // HIGH PERFORMANCE NATIVE PREVIEW (Prevents 500 Errors on massive datasets)
-        if ($extension === 'csv') {
-            if (($handle = fopen($fullPath, 'r')) !== false) {
-                // Get header row
-                $headerRow = fgetcsv($handle);
-                if ($headerRow !== false) {
-                    // Strip UTF-8 BOM if present
-                    $headerRow[0] = preg_replace('/^[\xef\xbb\xbf]+/', '', $headerRow[0]);
-                    $headers = $headerRow;
+        try {
+            if ($extension === 'csv') {
+                if (($handle = fopen($fullPath, 'r')) !== false) {
+                    $headerRow = fgetcsv($handle);
+                    if (is_array($headerRow) && !empty($headerRow)) {
+                        $headerRow[0] = preg_replace('/^[\xef\xbb\xbf]+/', '', $headerRow[0]); // Strip UTF-8 BOM
+                        $headers = $headerRow;
+                    }
+                    
+                    while (($data = fgetcsv($handle)) !== false && count($dataRows) < 5) {
+                        if (!empty(array_filter($data))) {
+                            $dataRows[] = $data;
+                        }
+                    }
+                    
+                    fseek($handle, 0);
+                    $lines = 0;
+                    while (fgets($handle) !== false) { 
+                        $lines++; 
+                    }
+                    $recordCount = max(0, $lines - 1);
+                    
+                    fclose($handle);
                 }
-                
-                // Get up to 5 preview rows
-                while (($data = fgetcsv($handle)) !== false && count($dataRows) < 5) {
-                    $dataRows[] = $data;
-                }
-                
-                // Fast line counter without loading to memory
-                $recordCount = count($dataRows);
-                fseek($handle, 0);
-                while (fgets($handle) !== false) { $recordCount++; }
-                $recordCount = max(0, $recordCount - count($dataRows) - 1);
-                
-                fclose($handle);
-            }
-        } else {
-            // Excel Fallback with Limits
-            $readerType = ExcelReaderTypeResolver::fromFilename($originalName);
-            $data = Excel::toArray(new class implements WithLimit {
-                public function limit(): int { return 6; }
-            }, $path, 'local', $readerType);
+            } else {
+                $readerType = ExcelReaderTypeResolver::fromFilename($originalName);
+                $data = Excel::toArray(new class implements WithLimit {
+                    public function limit(): int { return 6; }
+                }, $path, 'local', $readerType);
 
-            $rows = $data[0] ?? [];
-            $headers = count($rows) > 0 ? $rows[0] : [];
-            $dataRows = count($rows) > 1 ? array_slice($rows, 1, 5) : [];
-            $recordCount = count($rows); // Can't easily count full Excel rows without loading
+                $rows = $data[0] ?? [];
+                $headers = count($rows) > 0 ? $rows[0] : [];
+                $dataRows = count($rows) > 1 ? array_slice($rows, 1, 5) : [];
+                $recordCount = count($rows) > 1 ? count($rows) - 1 : 0; 
+            }
+        } catch (\Exception $e) {
+            Storage::disk('local')->delete($path);
+            return redirect()->route('admin.dashboard')->with('error', 'Error reading file preview: ' . $e->getMessage());
+        }
+
+        if (empty($headers)) {
+            Storage::disk('local')->delete($path);
+            return redirect()->route('admin.dashboard')->with('error', 'The uploaded file appears to be empty or corrupted.');
         }
 
         $normalizedHeaders = array_map(fn ($header) => $this->normalizeImportHeader((string) $header), $headers);
@@ -456,7 +473,8 @@ class BookController extends Controller
         );
 
         if ($totalRows > 10000) {
-            QueuedBooksExportJob::dispatch($transfer->id, $filters, $columns, $format, $exportLog->id);
+            // FIXED: Using the native ProcessBooksExportJob we built instead of QueuedBooksExportJob
+            ProcessBooksExportJob::dispatch($transfer->id, $filters, $columns, $format, $exportLog->id);
             return redirect()->route('admin.dashboard')->with('success', 'Export queued. Refresh Data Transfer Jobs to download when ready.');
         }
 
@@ -551,7 +569,6 @@ class BookController extends Controller
 
     protected function resizeAndSaveWithGd(string $srcPath, string $destPath, int $maxW, int $maxH, int $quality = 85, ?string &$error = null): bool
     {
-        // Standard GD image saving wrapper (Unchanged)
         $error = null;
         if (! extension_loaded('gd')) { $error = 'GD extension is not available.'; return false; }
         $info = @getimagesize($srcPath);
