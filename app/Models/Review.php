@@ -15,6 +15,8 @@ class Review extends Model
         'book_id',
         'rating',
         'comment',
+        'is_flagged_by_ai',
+        'ai_moderation_reason',
     ];
 
     public function user()

@@ -39,31 +39,35 @@
             </div>
 
             @php
-                $aiInsight = \Illuminate\Support\Facades\DB::table('ai_book_insights')->where('book_id', $book->id)->first();
+                try {
+                    $aiInsight = \Illuminate\Support\Facades\DB::table('ai_book_insights')->where('book_id', $book->id)->first();
+                } catch (\Exception $e) {
+                    $aiInsight = null;
+                }
             @endphp
 
-            @if($aiInsight)
+            @if($aiInsight && isset($aiInsight->ai_summary))
             <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-8 border border-indigo-100 shadow-sm">
                 <div class="flex items-center mb-3">
                     <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     <h3 class="text-lg font-bold text-gray-900">AI Review Consensus</h3>
                     
                     @php
-                        $sentimentColor = match($aiInsight->overall_sentiment) {
-                            'Positive' => 'bg-green-100 text-green-800',
-                            'Negative' => 'bg-red-100 text-red-800',
-                            'Neutral' => 'bg-gray-100 text-gray-800',
-                            default => 'bg-blue-100 text-blue-800',
-                        };
+                        $sentiment = $aiInsight->overall_sentiment ?? 'Neutral';
+                        $sentimentColor = 'bg-blue-100 text-blue-800';
+                        if ($sentiment === 'Positive') $sentimentColor = 'bg-green-100 text-green-800';
+                        if ($sentiment === 'Negative') $sentimentColor = 'bg-red-100 text-red-800';
+                        if ($sentiment === 'Neutral') $sentimentColor = 'bg-gray-100 text-gray-800';
                     @endphp
+                    
                     <span class="ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full {{ $sentimentColor }}">
-                        {{ $aiInsight->overall_sentiment }} Sentiment
+                        {{ $sentiment }} Sentiment
                     </span>
                 </div>
                 <p class="text-gray-700 italic">"{{ $aiInsight->ai_summary }}"</p>
                 <p class="text-xs text-gray-400 mt-3 flex justify-between">
-                    <span>✨ Synthesized by AI from {{ $aiInsight->reviews_analyzed_count }} reader reviews.</span>
-                    <span>Last updated: {{ \Carbon\Carbon::parse($aiInsight->updated_at)->diffForHumans() }}</span>
+                    <span>✨ Synthesized by AI from {{ $aiInsight->reviews_analyzed_count ?? 0 }} reader reviews.</span>
+                    <span>Last updated: {{ $aiInsight->updated_at ? \Carbon\Carbon::parse($aiInsight->updated_at)->diffForHumans() : 'Just now' }}</span>
                 </p>
             </div>
             @endif
