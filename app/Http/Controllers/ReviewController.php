@@ -17,6 +17,17 @@ class ReviewController extends Controller
      */
     public function store(Request $request, Book $book)
     {
+        // Authorization: Only admins or users who purchased the book can review
+        $hasPurchased = auth()->user()->orders()
+            ->where('status', 'completed')
+            ->whereHas('orderItems', function ($query) use ($book) {
+                $query->where('book_id', $book->id);
+            })->exists();
+
+        if (!auth()->user()->isAdmin() && !$hasPurchased) {
+            return back()->with('error', 'You must purchase this book to leave a review.');
+        }
+
         $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'nullable|string|max:1000',

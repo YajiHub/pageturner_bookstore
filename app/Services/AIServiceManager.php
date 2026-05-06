@@ -14,9 +14,9 @@ class AIServiceManager
      */
     public function generateWithFallback(string $prompt, string $featureName = 'general'): string
     {
-        $providers = config('ai.fallback_enabled', env('AI_FALLBACK_ENABLED', true))
-            ? [env('AI_DEFAULT_PROVIDER', 'gemini'), 'ollama']
-            : [env('AI_DEFAULT_PROVIDER', 'gemini')];
+        $providers = config('ai.fallback_enabled', true)
+            ? [config('ai.default_provider', 'gemini'), 'ollama']
+            : [config('ai.default_provider', 'gemini')];
 
         foreach ($providers as $provider) {
             try {
@@ -44,16 +44,16 @@ class AIServiceManager
 
     private function callGemini(string $prompt): string
     {
-        $apiKey = env('GEMINI_API_KEY');
+        $apiKey = config('ai.gemini.api_key');
         if (empty($apiKey)) {
-            throw new Exception("Gemini API key is missing.");
+            throw new Exception("Gemini API key is missing. Please set GEMINI_API_KEY in .env");
         }
 
-        // UPDATE THIS LINE: Change gemini-1.5-flash to gemini-3-flash-preview
+        $model = config('ai.gemini.model', 'gemini-3-flash-preview');
         $response = Http::timeout(60)
             ->withoutVerifying() 
             ->withHeaders(['Content-Type' => 'application/json'])
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={$apiKey}", [
+            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                 'contents' => [
                     [
                         'parts' => [
@@ -78,12 +78,12 @@ class AIServiceManager
 
     private function callOllama(string $prompt): string
     {
-        $baseUrl = env('OLLAMA_BASE_URL', 'http://localhost:11434');
-        $model = env('OLLAMA_MODEL', 'llama3.2');
-
-        if (!env('OLLAMA_ENABLED', true)) {
+        if (!config('ai.ollama.enabled', true)) {
              throw new Exception("Ollama fallback is disabled.");
         }
+
+        $baseUrl = config('ai.ollama.base_url', 'http://localhost:11434');
+        $model = config('ai.ollama.model', 'llama3.2');
 
         $response = Http::timeout(60)->post("{$baseUrl}/api/generate", [
             'model' => $model,
