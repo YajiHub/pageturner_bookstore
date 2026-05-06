@@ -65,6 +65,17 @@ class ReviewController extends Controller
             }
         }
 
+        $review = Review::create([
+            'user_id' => auth()->id(),
+            'book_id' => $book->id,
+            'rating' => $request->rating,
+            'comment' => $request->comment,
+        ]);
+
+        \App\Jobs\ModerateNewReviewJob::dispatch($review);
+
+        return back()->with('success', 'Review submitted. It will be visible shortly after automated review.');
+
         return redirect()->route('books.show', $book)
             ->with('success', $message);
     }

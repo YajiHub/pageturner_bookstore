@@ -119,6 +119,48 @@
     </div>
 </div>
 
+@php
+    $aiInsight = \Illuminate\Support\Facades\DB::table('ai_book_insights')->where('book_id', $book->id)->first();
+@endphp
+
+@if($aiInsight)
+<div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-8 border border-indigo-100 shadow-sm">
+    <div class="flex items-center mb-3">
+        <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+        <h3 class="text-lg font-bold text-gray-900">AI Review Consensus</h3>
+        
+        @php
+            $sentimentColor = match($aiInsight->overall_sentiment) {
+                'Positive' => 'bg-green-100 text-green-800',
+                'Negative' => 'bg-red-100 text-red-800',
+                'Neutral' => 'bg-gray-100 text-gray-800',
+                default => 'bg-blue-100 text-blue-800',
+            };
+        @endphp
+        <span class="ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full {{ $sentimentColor }}">
+            {{ $aiInsight->overall_sentiment }} Sentiment
+        </span>
+    </div>
+    <p class="text-gray-700 italic">"{{ $aiInsight->ai_summary }}"</p>
+    <p class="text-xs text-gray-400 mt-3 flex justify-between">
+        <span>✨ Synthesized by AI from {{ $aiInsight->reviews_analyzed_count }} reader reviews.</span>
+        <span>Last updated: {{ \Carbon\Carbon::parse($aiInsight->updated_at)->diffForHumans() }}</span>
+    </p>
+</div>
+@endif
+
+@foreach($book->reviews as $review)
+    @if(!$review->is_flagged_by_ai)
+        @else
+        @if(auth()->user()?->role === 'admin')
+            <div class="bg-red-50 p-4 border border-red-200 opacity-75">
+                <span class="text-red-600 font-bold">[HIDDEN BY AI MODERATION: {{ $review->ai_moderation_reason }}]</span>
+                <p>{{ $review->comment }}</p>
+            </div>
+        @endif
+    @endif
+@endforeach 
+
 {{-- Reviews Section --}}
 <div class="mt-8" id="reviews">
     <h2 class="text-2xl font-bold mb-6">Customer Reviews</h2>
