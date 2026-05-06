@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Book;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BookIntelligenceService
 {
@@ -14,7 +15,7 @@ class BookIntelligenceService
      */
     public function moderateReview(string $reviewText): array
     {
-        $prompt = "You are a strict content moderator for a family-friendly bookstore. Analyze the following review. If it contains profanity, hate speech, explicit content, or aggressive harassment, reply with 'FLAGGED: [Reason]'. If it is acceptable (even if it's a negative review of the book), reply with 'CLEAN'. Review: \"{$reviewText}\"";
+        $prompt = "You are a strict content moderator for a family-friendly bookstore. Analyze the following review. If it contains profanity, hate speech, explicit content, aggressive harassment, OR is clearly random keyboard-smash spam, reply with 'FLAGGED: [Reason]'. If it is acceptable, reply with 'CLEAN'. Review: \"{$reviewText}\"";
 
         try {
             $response = $this->aiManager->generateWithFallback($prompt, 'content_moderation');
@@ -25,7 +26,6 @@ class BookIntelligenceService
             }
             return ['is_flagged' => false, 'reason' => null];
         } catch (\Exception $e) {
-            // Fail open: don't block user reviews if AI is down
             return ['is_flagged' => false, 'reason' => 'AI System Unavailable'];
         }
     }
@@ -37,25 +37,23 @@ class BookIntelligenceService
     {
         $reviews = DB::table('reviews')
             ->where('book_id', $book->id)
-            ->where('is_flagged_by_ai', false) // Don't include toxic reviews
+            ->where('is_flagged_by_ai', false) 
             ->pluck('comment')
             ->toArray();
 
-        if (count($reviews) < 3) {
-            return; // Not enough data to summarize
+        // CHANGED FROM 3 TO 1: Now it will summarize even a single review!
+        if (count($reviews) < 1) {
+            return; 
         }
 
-        // Limit to recent 20 reviews to avoid token limits
         $reviewsToAnalyze = array_slice($reviews, 0, 20);
         $reviewsText = implode("\n- ", $reviewsToAnalyze);
 
         $prompt = "You are a literary analyst. Read these customer reviews for a book. Provide a JSON response with exactly two keys: 'summary' (a single, engaging 3-sentence paragraph summarizing the overall consensus of what readers liked and disliked) and 'sentiment' (exactly one of these words: Positive, Neutral, Negative, Mixed). Reviews:\n- {$reviewsText}";
 
         try {
-            // Instruct Gemini/Ollama to return JSON
             $response = $this->aiManager->generateWithFallback($prompt . "\n\nRETURN ONLY VALID JSON.", 'review_summarization');
             
-            // Clean markdown JSON formatting if present
             $jsonString = str_replace(['```json', '```'], '', $response);
             $data = json_decode(trim($jsonString), true);
 
@@ -71,7 +69,7 @@ class BookIntelligenceService
                 );
             }
         } catch (\Exception $e) {
-            \Log::error("Failed to generate AI insight for Book {$book->id}: " . $e->getMessage());
+            Log::error("Failed to generate AI insight for Book {$book->id}: " . $e->getMessage());
         }
     }
 }

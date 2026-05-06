@@ -1,257 +1,156 @@
-@extends('layouts.app')
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ $book->title }}
+        </h2>
+    </x-slot>
 
-@section('title', $book->title . ' - PageTurner')
-
-@section('content')
-<div class="mb-4 flex items-center gap-3">
-    <a href="{{ route('books.index') }}" class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800">
-        <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-        Back to Books
-    </a>
-</div>
-
-<div class="bg-white rounded-lg shadow-lg overflow-hidden">
-    <div class="md:flex">
-        {{-- Book Cover --}}
-        <div class="md:w-1/3 bg-gray-200 p-8 flex items-center justify-center">
-            @if($book->cover_image)
-                <img src="{{ asset('storage/' . $book->cover_image) }}" alt="{{ $book->title }}" class="max-h-96 object-contain">
-            @else
-                <svg class="h-48 w-48 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                </svg>
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            
+            @if (session('success'))
+                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+                    {{ session('success') }}
+                </div>
             @endif
-        </div>
 
-        {{-- Book Details --}}
-        <div class="md:w-2/3 p-8">
-            <span class="text-indigo-600 text-sm font-medium">{{ $book->category->name }}</span>
-            <h1 class="text-3xl font-bold text-gray-900 mt-2">{{ $book->title }}</h1>
-            <p class="text-xl text-gray-600 mt-1">by {{ $book->author }}</p>
-
-            {{-- Rating --}}
-            <div class="flex items-center mt-4">
-                @for($i = 1; $i <= 5; $i++)
-                    <svg class="h-6 w-6 {{ $i <= round($book->average_rating) ? 'text-yellow-400' : 'text-gray-300' }}" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                    </svg>
-                @endfor
-                <span class="ml-2 text-gray-600">{{ number_format($book->average_rating, 1) }} ({{ $book->reviews->count() }} reviews)</span>
-            </div>
-
-            <p class="text-3xl font-bold text-indigo-600 mt-4">₱{{ number_format($book->price, 2) }}</p>
-
-            <div class="mt-4">
-                <span class="text-sm {{ $book->stock_quantity > 0 ? 'text-green-600' : 'text-red-600' }}">
-                    @if($book->stock_quantity > 0)
-                        In Stock ({{ $book->stock_quantity }} available)
-                    @else
-                        Out of Stock
-                    @endif
-                </span>
-            </div>
-
-            <div class="mt-4">
-                <p class="text-gray-600 text-sm"><strong>ISBN:</strong> {{ $book->isbn }}</p>
-            </div>
-
-            <div class="mt-6">
-                <h3 class="font-semibold text-gray-800">Description</h3>
-                <p class="text-gray-600 mt-2">{{ $book->description }}</p>
-                @if($book->stock_quantity > 0)
-                    @auth
-                        @unless(auth()->user()->isAdmin())
-                            <div class="mt-4 flex items-center gap-3">
-                                <form action="{{ route('cart.add', $book) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="bg-gray-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                        Add to Cart
-                                    </button>
-                                </form>
-
-                                <form action="{{ route('orders.store') }}" method="POST">
-                                    @csrf
-                                    <input type="hidden" name="book_id" value="{{ $book->id }}">
-                                    <button type="submit" class="bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-md text-sm font-medium">
-                                        Buy Now
-                                    </button>
-                                </form>
-
-                                @if($hasPurchased)
-                                    <span class="ml-4 text-green-600 text-sm">✓ You own this book</span>
-                                @endif
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-8">
+                <div class="p-6 bg-white border-b border-gray-200">
+                    <div class="flex flex-col md:flex-row gap-6">
+                        <div class="flex-1">
+                            <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ $book->title }}</h1>
+                            <p class="text-lg text-gray-600 mb-4">By {{ $book->author }}</p>
+                            
+                            <div class="mb-4 space-y-1 text-sm text-gray-500">
+                                <p><strong>ISBN:</strong> {{ $book->isbn }}</p>
+                                <p><strong>Publisher:</strong> {{ $book->publisher }}</p>
+                                <p><strong>Format:</strong> {{ $book->format }}</p>
+                                <p><strong>Published:</strong> {{ \Carbon\Carbon::parse($book->published_at)->format('F Y') }}</p>
                             </div>
-                        @endunless
-                    @else
-                        <div class="mt-4 flex items-center gap-3">
-                            <form action="{{ route('cart.add', $book) }}" method="POST">
-                                @csrf
-                                <button type="submit" class="bg-gray-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                    Add to Cart
-                                </button>
-                            </form>
-                            <a href="{{ route('login') }}" class="text-sm text-indigo-600 hover:text-indigo-800">Sign in to checkout</a>
+
+                            <p class="text-2xl font-bold text-indigo-600 mb-4">₱{{ number_format($book->price, 2) }}</p>
+                            
+                            <div class="prose max-w-none text-gray-700">
+                                <p>{{ $book->description }}</p>
+                            </div>
                         </div>
-                    @endauth
-                @else
-                    <button disabled class="bg-gray-400 text-white px-3 py-2 rounded-md text-sm cursor-not-allowed">Out of Stock</button>
-                @endif
+                    </div>
+                </div>
             </div>
 
-            {{-- Admin Actions --}}
-            @auth
-                @if(auth()->user()->isAdmin())
-                    <div class="mt-6 flex space-x-4">
-                        <a href="{{ route('admin.books.edit', $book) }}" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">
-                            Edit Book
-                        </a>
-                        <form action="{{ route('admin.books.destroy', $book) }}" method="POST" onsubmit="return confirm('Are you sure?')">
+            @php
+                $aiInsight = \Illuminate\Support\Facades\DB::table('ai_book_insights')->where('book_id', $book->id)->first();
+            @endphp
+
+            @if($aiInsight)
+            <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-8 border border-indigo-100 shadow-sm">
+                <div class="flex items-center mb-3">
+                    <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <h3 class="text-lg font-bold text-gray-900">AI Review Consensus</h3>
+                    
+                    @php
+                        $sentimentColor = match($aiInsight->overall_sentiment) {
+                            'Positive' => 'bg-green-100 text-green-800',
+                            'Negative' => 'bg-red-100 text-red-800',
+                            'Neutral' => 'bg-gray-100 text-gray-800',
+                            default => 'bg-blue-100 text-blue-800',
+                        };
+                    @endphp
+                    <span class="ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full {{ $sentimentColor }}">
+                        {{ $aiInsight->overall_sentiment }} Sentiment
+                    </span>
+                </div>
+                <p class="text-gray-700 italic">"{{ $aiInsight->ai_summary }}"</p>
+                <p class="text-xs text-gray-400 mt-3 flex justify-between">
+                    <span>✨ Synthesized by AI from {{ $aiInsight->reviews_analyzed_count }} reader reviews.</span>
+                    <span>Last updated: {{ \Carbon\Carbon::parse($aiInsight->updated_at)->diffForHumans() }}</span>
+                </p>
+            </div>
+            @endif
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 bg-white border-b border-gray-200">
+                    <h2 class="text-2xl font-bold mb-6 text-gray-800">Customer Reviews</h2>
+
+                    @auth
+                        <form action="{{ route('reviews.store', $book) }}" method="POST" class="mb-8 p-5 bg-gray-50 border border-gray-100 rounded-lg">
                             @csrf
-                            @method('DELETE')
-                            <button type="submit" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">
-                                Delete Book
+                            <h3 class="font-semibold text-gray-800 mb-4">Write a Review</h3>
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Rating (1-5)</label>
+                                <select name="rating" class="border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm w-full sm:w-auto">
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Good</option>
+                                    <option value="3">3 - Average</option>
+                                    <option value="2">2 - Poor</option>
+                                    <option value="1">1 - Terrible</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Your Review</label>
+                                <textarea name="comment" rows="3" class="border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm w-full" placeholder="What did you think of this book?"></textarea>
+                            </div>
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded transition duration-150">
+                                Submit Review
                             </button>
                         </form>
-                    </div>
-                @endif
-            @endauth
-        </div>
-    </div>
-</div>
-
-@php
-    $aiInsight = \Illuminate\Support\Facades\DB::table('ai_book_insights')->where('book_id', $book->id)->first();
-@endphp
-
-@if($aiInsight)
-<div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-8 border border-indigo-100 shadow-sm">
-    <div class="flex items-center mb-3">
-        <svg class="w-6 h-6 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-        <h3 class="text-lg font-bold text-gray-900">AI Review Consensus</h3>
-        
-        @php
-            $sentimentColor = match($aiInsight->overall_sentiment) {
-                'Positive' => 'bg-green-100 text-green-800',
-                'Negative' => 'bg-red-100 text-red-800',
-                'Neutral' => 'bg-gray-100 text-gray-800',
-                default => 'bg-blue-100 text-blue-800',
-            };
-        @endphp
-        <span class="ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full {{ $sentimentColor }}">
-            {{ $aiInsight->overall_sentiment }} Sentiment
-        </span>
-    </div>
-    <p class="text-gray-700 italic">"{{ $aiInsight->ai_summary }}"</p>
-    <p class="text-xs text-gray-400 mt-3 flex justify-between">
-        <span>✨ Synthesized by AI from {{ $aiInsight->reviews_analyzed_count }} reader reviews.</span>
-        <span>Last updated: {{ \Carbon\Carbon::parse($aiInsight->updated_at)->diffForHumans() }}</span>
-    </p>
-</div>
-@endif
-
-@foreach($book->reviews as $review)
-    @if(!$review->is_flagged_by_ai)
-        @else
-        @if(auth()->user()?->role === 'admin')
-            <div class="bg-red-50 p-4 border border-red-200 opacity-75">
-                <span class="text-red-600 font-bold">[HIDDEN BY AI MODERATION: {{ $review->ai_moderation_reason }}]</span>
-                <p>{{ $review->comment }}</p>
-            </div>
-        @endif
-    @endif
-@endforeach 
-
-{{-- Reviews Section --}}
-<div class="mt-8" id="reviews">
-    <h2 class="text-2xl font-bold mb-6">Customer Reviews</h2>
-
-    {{-- Review Form (only for users who purchased this book) --}}
-    @auth
-        @if($hasPurchased)
-            <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <h3 class="font-semibold text-lg mb-4">{{ $userReview ? 'Edit Your Review' : 'Write a Review' }}</h3>
-                <form action="{{ route('reviews.store', $book) }}" method="POST">
-                    @csrf
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2">Rating</label>
-                        <select name="rating" class="border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
-                            <option value="">Select rating</option>
-                            @for($i = 5; $i >= 1; $i--)
-                                <option value="{{ $i }}" {{ (int) old('rating', $userReview?->rating) === $i ? 'selected' : '' }}>{{ $i }} Star{{ $i > 1 ? 's' : '' }}</option>
-                            @endfor
-                        </select>
-                    </div>
-                    <div class="mb-4">
-                        <label class="block text-gray-700 mb-2">Comment</label>
-                        <textarea name="comment" rows="4" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Share your thoughts about this book...">{{ old('comment', $userReview?->comment) }}</textarea>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition">
-                            {{ $userReview ? 'Update Review' : 'Submit Review' }}
-                        </button>
-                    </div>
-                </form>
-                @if($userReview)
-                    <form action="{{ route('reviews.destroy', $userReview) }}" method="POST" onsubmit="return confirm('Delete your review?');" class="mt-3">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="text-red-600 hover:text-red-700 text-sm font-medium">Delete Review</button>
-                    </form>
-                @endif
-            </div>
-        @else
-            @unless(auth()->user()->isAdmin())
-                <x-alert type="info" class="mb-6">
-                    You can write a review once your order for this book is completed.
-                </x-alert>
-            @endunless
-            {{-- <x-alert type="info" class="mb-6">
-                You can write a review once your order for this book is completed.
-            </x-alert> --}}
-        @endif
-    @else
-        <x-alert type="info" class="mb-6">
-            <a href="{{ route('login') }}" class="text-indigo-600 hover:underline">Login</a> to write a review.
-        </x-alert>
-    @endauth
-
-    {{-- Display Reviews --}}
-    @forelse($book->reviews as $review)
-        <div class="bg-white rounded-lg shadow p-6 mb-4">
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="font-semibold">{{ $review->user?->name ?? 'Deleted User' }}</p>
-                    <div class="flex items-center mt-1">
-                        @for($i = 1; $i <= 5; $i++)
-                            <svg class="h-4 w-4 {{ $i <= $review->rating ? 'text-yellow-400' : 'text-gray-300' }}" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                            </svg>
-                        @endfor
-                    </div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <span class="text-gray-500 text-sm">{{ $review->created_at->diffForHumans() }}</span>
-                    @auth
-                        @if(auth()->id() === $review->user_id || auth()->user()->isAdmin())
-                            <form action="{{ route('reviews.destroy', $review) }}" method="POST">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-red-500 hover:text-red-700 text-sm">Delete</button>
-                            </form>
-                        @endif
+                    @else
+                        <div class="mb-8 p-4 bg-gray-50 border border-gray-100 rounded-lg text-gray-600">
+                            Please <a href="{{ route('login') }}" class="text-indigo-600 hover:underline">log in</a> to write a review.
+                        </div>
                     @endauth
+
+                    <div class="space-y-6">
+                        @forelse($book->reviews as $review)
+                            
+                            @if(!$review->is_flagged_by_ai)
+                                <div class="border-b border-gray-100 pb-5">
+                                    <div class="flex items-center mb-1">
+                                        <span class="font-bold text-gray-900 mr-2">{{ $review->user->name ?? 'Anonymous' }}</span>
+                                        <span class="text-yellow-400 text-sm tracking-widest">
+                                            {{ str_repeat('★', $review->rating) }}{{ str_repeat('☆', 5 - $review->rating) }}
+                                        </span>
+                                    </div>
+                                    <p class="text-gray-500 text-xs mb-3">{{ $review->created_at->format('M d, Y') }}</p>
+                                    <p class="text-gray-800">{{ $review->comment }}</p>
+                                    
+                                    @if(auth()->check() && (auth()->id() === $review->user_id || auth()->user()->role === 'admin'))
+                                        <form action="{{ route('reviews.destroy', $review) }}" method="POST" class="mt-3">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-500 text-xs hover:text-red-700 hover:underline" onclick="return confirm('Delete this review?')">Delete Review</button>
+                                        </form>
+                                    @endif
+                                </div>
+                            
+                            @else
+                                @if(auth()->check() && auth()->user()->role === 'admin')
+                                    <div class="bg-red-50 p-4 border border-red-200 rounded-lg mb-4">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-red-700 font-bold text-sm flex items-center">
+                                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                                HIDDEN BY AI: {{ $review->ai_moderation_reason }}
+                                            </span>
+                                        </div>
+                                        <p class="text-gray-800 italic line-through opacity-75">{{ $review->comment }}</p>
+                                        <p class="text-xs text-gray-500 mt-2 font-medium">Attempted post by: {{ $review->user->name ?? 'Anonymous' }}</p>
+                                        <form action="{{ route('reviews.destroy', $review) }}" method="POST" class="mt-3">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-700 text-xs font-bold hover:underline" onclick="return confirm('Permanently delete this toxic review?')">Delete Permanently</button>
+                                        </form>
+                                    </div>
+                                @endif
+                            @endif
+
+                        @empty
+                            <div class="text-center py-8">
+                                <p class="text-gray-500 italic">No reviews yet. Be the first to share your thoughts!</p>
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
-            @isset($review->comment)
-                <p class="text-gray-600 mt-3">{{ $review->comment }}</p>
-            @endisset
         </div>
-    @empty
-        @if(!auth()->check() || !auth()->user()->isAdmin())
-            <x-alert type="info">
-                No reviews yet. Be the first to review this book!
-            </x-alert>
-        @endif
-    @endforelse
-</div>
-@endsection
+    </div>
+</x-app-layout>

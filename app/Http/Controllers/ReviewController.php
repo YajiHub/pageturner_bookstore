@@ -6,95 +6,82 @@ use App\Models\Book;
 use App\Models\Review;
 use App\Models\User;
 use App\Notifications\NewReviewAdminNotification;
-use App\Services\AuditLogger;
 use Illuminate\Http\Request;
-use Throwable;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
 
 class ReviewController extends Controller
 {
+    /**
+     * Store a newly created review or update an existing one.
+     */
     public function store(Request $request, Book $book)
     {
-        $this->authorize('create', [Review::class, $book]);
-
-        $validated = $request->validate([
+        $request->validate([
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'nullable|string|max:1000',
         ]);
 
-        $validated['user_id'] = auth()->id();
-        $validated['book_id'] = $book->id;
+        // 1. Create or Update the Review FIRST
+        // If the user already reviewed the book, this safely overwrites their old review.
+        $review = Review::updateOrCreate(
+            [
+                // Search parameters
+                'user_id' => auth()->id(),
+                'book_id' => $book->id,
+            ],
+            [
+                // Values to update or insert
+                'rating' => $request->rating,
+                'comment' => $request->comment,
+                
+                // Reset AI moderation flags so the new/edited text gets reviewed freshly
+                'is_flagged_by_ai' => false,
+                'ai_moderation_reason' => null,
+            ]
+        );
 
-        // Check if user already reviewed this book
-        $existingReview = Review::where('user_id', auth()->id())
-            ->where('book_id', $book->id)
-            ->first();
-
-        if ($existingReview) {
-            $before = $existingReview->only(['rating', 'comment']);
-            $existingReview->update($validated);
-
-            AuditLogger::log(
-                action: 'review.updated',
-                auditable: $existingReview,
-                oldValues: $before,
-                newValues: $existingReview->only(['rating', 'comment', 'book_id', 'user_id']),
-                description: 'Customer updated a review.'
-            );
-
-            $message = 'Review updated successfully!';
-        } else {
-            $review = Review::create($validated);
-            $message = 'Review submitted successfully!';
-
-            AuditLogger::log(
-                action: 'review.created',
-                auditable: $review,
-                newValues: $review->only(['rating', 'comment', 'book_id', 'user_id']),
-                description: 'Customer submitted a new review.'
-            );
-
-            // Notify admins about the new review (non-blocking)
+        // 2. Send email notification to admins using the freshly created $review object
+        $admins = User::where('role', 'admin')->get();
+        if ($admins->isNotEmpty()) {
             try {
-                $review->load(['user', 'book']);
-                User::where('role', 'admin')->each(function ($admin) use ($review) {
-                    $admin->notify(new NewReviewAdminNotification($review));
-                });
-            } catch (Throwable $e) {
+                Notification::send($admins, new NewReviewAdminNotification($review));
+            } catch (\Exception $e) {
                 report($e);
-                $message = 'Review submitted successfully, but admin notification email could not be sent.';
             }
         }
 
-        $review = Review::create([
-            'user_id' => auth()->id(),
-            'book_id' => $book->id,
-            'rating' => $request->rating,
-            'comment' => $request->comment,
-        ]);
-
-        \App\Jobs\ModerateNewReviewJob::dispatch($review);
+        // 3. LAB 8: Dispatch AI task to background queue for moderation and summarization
+        if (class_exists(\App\Jobs\ModerateNewReviewJob::class)) {
+            \App\Jobs\ModerateNewReviewJob::dispatch($review);
+        }
 
         return back()->with('success', 'Review submitted. It will be visible shortly after automated review.');
-
-        return redirect()->route('books.show', $book)
-            ->with('success', $message);
     }
 
+    /**
+     * Remove the specified review from storage.
+     */
     public function destroy(Review $review)
     {
-        $this->authorize('delete', $review);
+        // Simple authorization check
+        if (auth()->user()->role !== 'admin' && auth()->id() !== $review->user_id) {
+            abort(403, 'Unauthorized action.');
+        }
 
         $book = $review->book;
-        $snapshot = $review->only(['id', 'user_id', 'book_id', 'rating', 'comment']);
         $review->delete();
 
-        AuditLogger::log(
-            action: 'review.deleted',
-            oldValues: $snapshot,
-            description: 'Review deleted by owner/admin.'
-        );
+        // LAB 8: If a review is deleted, recalculate the AI Book Consensus
+        if (class_exists(\App\Services\BookIntelligenceService::class)) {
+            try {
+                $aiService = app(\App\Services\BookIntelligenceService::class);
+                $aiService->generateBookConsensus($book);
+            } catch (\Exception $e) {
+                Log::error("Failed to recalculate AI consensus on review delete: " . $e->getMessage());
+            }
+        }
 
-        return redirect()->route('books.show', $book)
-            ->with('success', 'Review deleted successfully!');
+        return back()->with('success', 'Review deleted successfully.');
     }
 }

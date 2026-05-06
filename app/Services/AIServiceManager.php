@@ -6,10 +6,6 @@ use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use GeminiAPI\Client;
-use GeminiAPI\Resources\Parts\TextPart;
-use GeminiAPI\Enums\Role;
-use GeminiAPI\Resources\Message;
 
 class AIServiceManager
 {
@@ -53,10 +49,31 @@ class AIServiceManager
             throw new Exception("Gemini API key is missing.");
         }
 
-        $client = new Client($apiKey);
-        $response = $client->geminiPro()->generateContent(new TextPart($prompt));
+        // UPDATE THIS LINE: Change gemini-1.5-flash to gemini-3-flash-preview
+        $response = Http::timeout(60)
+            ->withoutVerifying() 
+            ->withHeaders(['Content-Type' => 'application/json'])
+            ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={$apiKey}", [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $prompt]
+                        ]
+                    ]
+                ]
+            ]);
+
+        if ($response->failed()) {
+            throw new Exception("Gemini request failed: " . $response->body());
+        }
+
+        $data = $response->json();
         
-        return $response->text();
+        if (isset($data['candidates'][0]['content']['parts'][0]['text'])) {
+            return $data['candidates'][0]['content']['parts'][0]['text'];
+        }
+
+        throw new Exception("Unexpected Gemini response format.");
     }
 
     private function callOllama(string $prompt): string
@@ -94,7 +111,7 @@ class AIServiceManager
             'feature' => $feature,
             'tokens_used' => (int) $estimatedTokens,
             'cost_estimate' => $cost,
-            'input_prompt' => $input, // Optional: mask this in production if containing PII
+            'input_prompt' => $input, 
             'output_response' => $output,
             'was_fallback' => $wasFallback,
             'created_at' => now(),
