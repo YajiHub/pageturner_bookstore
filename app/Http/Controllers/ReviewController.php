@@ -95,4 +95,34 @@ class ReviewController extends Controller
 
         return back()->with('success', 'Review deleted successfully.');
     }
+
+
+    public function overrideAiModeration(Review $review)
+    {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $oldReason = $review->ai_moderation_reason;
+
+        $review->update([
+            'is_flagged_by_ai' => false,
+            'ai_moderation_reason' => null,
+        ]);
+
+        // Audit the manual override using the correct static method
+        \App\Services\AuditLogger::log(
+            'admin_overrode_ai_moderation',
+            $review,
+            ['previous_reason' => $oldReason],
+            [],
+            'Admin manually overrode AI quarantine and restored review.'
+        );
+
+        // Recalculate consensus since the review is now active again
+        app(\App\Services\BookIntelligenceService::class)->generateBookConsensus($review->book);
+
+        return back()->with('success', 'AI Moderation manually overridden. Review is now public.');
+    }
+    
 }

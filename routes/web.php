@@ -74,6 +74,9 @@ Route::middleware('auth')->group(function () {
 
 // Admin-only routes (Category & Book management)
 Route::middleware(['auth', 'verified', 'admin', 'normalize.input', 'throttle:admin-actions'])->prefix('admin')->name('admin.')->group(function () {
+
+    Route::patch('/admin/reviews/{review}/override', [App\Http\Controllers\ReviewController::class, 'overrideAiModeration'])->name('reviews.override');
+
     // Admin Dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/transfer-jobs/progress', [AdminDashboardController::class, 'transferJobsProgress'])->name('transfer-jobs.progress');
