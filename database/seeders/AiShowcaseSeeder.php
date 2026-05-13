@@ -12,29 +12,35 @@ class AiShowcaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->command->info("Seeding AI Reviews & Insights for Showcase...");
+        $this->command->info("Seeding Realistic AI Reviews & Insights for Showcase...");
 
         $customers = User::where('role', 'customer')->take(5)->get();
-        if ($customers->count() < 3) return;
+        if ($customers->count() < 4) return;
 
-        // Pick 5 random books to be our "Showcase" books
         $showcaseBooks = Book::inRandomOrder()->take(5)->get();
 
+        // Three distinct, realistic reviews to make the AI summary make sense
+        $distinctReviews = [
+            ['rating' => 5, 'comment' => "I absolutely loved this book! The English prose was beautiful and the story kept me hooked until the very end. Highly recommended."],
+            ['rating' => 4, 'comment' => "A very solid read. The world-building is fantastic, though I felt the pacing in the middle chapters dragged just a little bit. Still a great experience."],
+            ['rating' => 5, 'comment' => "An absolute masterpiece! The character development is top-notch and the climax left me speechless. 5 stars all the way."],
+        ];
+
         foreach ($showcaseBooks as $book) {
-            // 1. Create 3 Good/Normal Reviews
-            foreach ($customers->take(3) as $index => $customer) {
+            // 1. Create the 3 distinct Normal Reviews
+            foreach ($distinctReviews as $index => $reviewData) {
                 Review::create([
-                    'user_id' => $customer->id,
+                    'user_id' => $customers[$index]->id,
                     'book_id' => $book->id,
-                    'rating' => rand(4, 5),
-                    'comment' => "I absolutely loved this book! The English prose was beautiful and the story kept me hooked until the very end. Highly recommended.",
+                    'rating' => $reviewData['rating'],
+                    'comment' => $reviewData['comment'],
                     'is_flagged_by_ai' => false,
                 ]);
             }
 
-            // 2. Create 1 Toxic Review (Hidden by AI)
+            // 2. Create 1 Toxic Review (Hidden from normal users by the UI!)
             Review::create([
-                'user_id' => $customers->last()->id,
+                'user_id' => $customers[3]->id,
                 'book_id' => $book->id,
                 'rating' => 1,
                 'comment' => "This book is complete garbage. The author is an absolute idiot and I hate everything about this stupid website.",
@@ -42,17 +48,17 @@ class AiShowcaseSeeder extends Seeder
                 'ai_moderation_reason' => 'AGGRESSIVE HARASSMENT / PROFANITY',
             ]);
 
-            // 3. Directly inject an AI Consensus so the UI displays immediately
+            // 3. Inject an AI Consensus that perfectly matches the distinct reviews above
             DB::table('ai_book_insights')->insert([
                 'book_id' => $book->id,
-                'ai_summary' => "The overall consensus among readers is overwhelmingly positive. Customers frequently praise the beautiful prose and gripping storyline that keeps them engaged. While there was a minor detractor regarding the pacing, the majority highly recommend this masterpiece.",
+                'ai_summary' => "The overall consensus among readers is highly positive, reflecting a strong 4.6-star average. Customers frequently praise the beautiful prose, fantastic world-building, and gripping character development. While there was a minor note regarding slow pacing in the middle chapters, the majority consider it a highly recommended masterpiece.",
                 'overall_sentiment' => 'Positive',
-                'reviews_analyzed_count' => 4,
+                'reviews_analyzed_count' => 3, // FIXED: Toxic reviews are ignored, so only 3 are analyzed!
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // 4. Mock an AI Usage Log for the Audit Trail
+            // 4. Mock an AI Usage Log
             DB::table('ai_usage_logs')->insert([
                 'provider' => 'gemini',
                 'feature' => 'review_summarization',

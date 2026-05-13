@@ -32,15 +32,21 @@
         @endauth
     </div>
     
-    @if($category->books->isEmpty())
+    {{-- FIXED: Changed to $books to use the paginated data from the controller --}}
+    @if($books->isEmpty())
         <x-alert type="info">
             No books available in this category at the moment. Check back soon!
         </x-alert>
     @else
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            @foreach($category->books as $book)
+            @foreach($books as $book)
                 <x-book-card :book="$book" />
             @endforeach
+        </div>
+
+        {{-- ADDED: The pagination buttons to prevent the 125,000 book load crash --}}
+        <div class="mt-8">
+            {{ $books->links() }}
         </div>
     @endif
 
