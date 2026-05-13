@@ -15,7 +15,12 @@ class BookIntelligenceService
      */
     public function moderateReview(string $reviewText): array
     {
-        $prompt = "You are a strict content moderator for a family-friendly bookstore. Analyze the following review. If it contains profanity, hate speech, explicit content, aggressive harassment, OR is clearly random keyboard-smash spam, reply with 'FLAGGED: [Reason]'. If it is acceptable, reply with 'CLEAN'. Review: \"{$reviewText}\"";
+        //Explicitly allows harsh/negative reviews to protect free speech, 
+        // while strictly blocking actual profanity and slurs.
+        $prompt = "You are a content moderator for an online bookstore. Customers are fully allowed to leave extremely bad, harsh, or 1-star reviews if they hate a book, the website, or the author. DO NOT flag a review simply because it is negative, mean, or highly critical. 
+        HOWEVER, if the review contains explicit severe profanity (e.g., f-words, s-words), racial/derogatory slurs, extreme hate speech against a protected group, or illegal explicit content, reply with 'FLAGGED: [Reason]'. 
+        If the review is just a normal bad review (even if it uses words like 'garbage', 'idiot', or 'terrible') OR if it is a positive review, reply exactly with 'CLEAN'. 
+        Review to analyze: \"{$reviewText}\"";
 
         try {
             $response = $this->aiManager->generateWithFallback($prompt, 'content_moderation');
@@ -41,7 +46,7 @@ class BookIntelligenceService
             ->pluck('comment')
             ->toArray();
 
-        // CHANGED FROM 3 TO 1: Now it will summarize even a single review!
+        // Summarize even if there is just 1 review!
         if (count($reviews) < 1) {
             return; 
         }

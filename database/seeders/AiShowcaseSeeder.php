@@ -12,16 +12,16 @@ class AiShowcaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->command->info("Seeding Realistic AI Reviews & Insights for Showcase...");
+        $this->command->info("Seeding Fully Aligned AI Reviews & Insights...");
 
         $customers = User::where('role', 'customer')->take(5)->get();
         if ($customers->count() < 4) return;
 
         $showcaseBooks = Book::inRandomOrder()->take(5)->get();
 
-        // Three distinct, realistic reviews to make the AI summary make sense
+        // 3 distinct reviews matching a perfect 4.7-star average (5, 4, 5)
         $distinctReviews = [
-            ['rating' => 5, 'comment' => "I absolutely loved this book! The English prose was beautiful and the story kept me hooked until the very end. Highly recommended."],
+            ['rating' => 5, 'comment' => "I absolutely loved this book! The prose was beautiful and the story kept me hooked until the very end. Highly recommended."],
             ['rating' => 4, 'comment' => "A very solid read. The world-building is fantastic, though I felt the pacing in the middle chapters dragged just a little bit. Still a great experience."],
             ['rating' => 5, 'comment' => "An absolute masterpiece! The character development is top-notch and the climax left me speechless. 5 stars all the way."],
         ];
@@ -38,7 +38,7 @@ class AiShowcaseSeeder extends Seeder
                 ]);
             }
 
-            // 2. Create 1 Toxic Review (Hidden from normal users by the UI!)
+            // 2. Create 1 Toxic Review (Hidden from all math and normal UI)
             Review::create([
                 'user_id' => $customers[3]->id,
                 'book_id' => $book->id,
@@ -48,12 +48,12 @@ class AiShowcaseSeeder extends Seeder
                 'ai_moderation_reason' => 'AGGRESSIVE HARASSMENT / PROFANITY',
             ]);
 
-            // 3. Inject an AI Consensus that perfectly matches the distinct reviews above
+            // 3. Inject an AI Consensus explicitly stating the verified 4.7 math
             DB::table('ai_book_insights')->insert([
                 'book_id' => $book->id,
-                'ai_summary' => "The overall consensus among readers is highly positive, reflecting a strong 4.6-star average. Customers frequently praise the beautiful prose, fantastic world-building, and gripping character development. While there was a minor note regarding slow pacing in the middle chapters, the majority consider it a highly recommended masterpiece.",
+                'ai_summary' => "The overall consensus among readers is highly positive, reflecting a strong 4.7-star average. Customers frequently praise the beautiful prose, fantastic world-building, and gripping character development. While there was a minor note regarding slow pacing in the middle chapters, the majority consider it a highly recommended masterpiece.",
                 'overall_sentiment' => 'Positive',
-                'reviews_analyzed_count' => 3, // FIXED: Toxic reviews are ignored, so only 3 are analyzed!
+                'reviews_analyzed_count' => 3, 
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -72,6 +72,6 @@ class AiShowcaseSeeder extends Seeder
             ]);
         }
 
-        $this->command->info("AI Showcase Data successfully populated!");
+        $this->command->info("Aligned AI Showcase Data successfully populated!");
     }
 }
