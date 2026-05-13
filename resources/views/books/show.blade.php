@@ -3,9 +3,10 @@
 @section('title', $book->title . ' - PageTurner Bookstore')
 
 @php
-    // Calculate average rating
-    $avgRating = $book->reviews->avg('rating') ?? 0;
-    $reviewCount = $book->reviews->count();
+    // Calculate average rating (only from visible reviews - not flagged by AI)
+    $visibleReviews = $book->reviews->where('is_flagged_by_ai', false);
+    $avgRating = $visibleReviews->avg('rating') ?? 0;
+    $reviewCount = $visibleReviews->count();
     $roundedRating = round($avgRating, 1);
 @endphp
 
@@ -30,7 +31,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-12 mb-12">
         <!-- Left: Book Cover Image -->
         <div class="lg:col-span-2">
-            <div class="bg-gray-100 rounded-xl overflow-hidden shadow-2xl sticky top-20 border border-gray-200">
+            <div class="bg-gray-100 rounded-xl overflow-hidden shadow-2xl sticky top-20 border border-gray-200 max-w-xs mx-auto lg:mx-0">
                 @if($book->cover_image)
                     <img src="{{ Storage::url($book->cover_image) }}" alt="{{ $book->title }}" class="w-full h-auto object-cover aspect-[3/4]">
                 @else

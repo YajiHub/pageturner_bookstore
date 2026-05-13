@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Create admin user
+        // 1. Create Admin
         User::factory()->create([
             'name' => 'Admin User',
             'email' => 'admin@pageturner.com',
@@ -19,19 +19,26 @@ class DatabaseSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
 
-        // 2. Create customer users
+        // 2. Create Customers (Needed for reviews)
         User::factory(10)->create([
             'role' => 'customer',
             'email_verified_at' => now(),
         ]);
 
-        // 3. Create categories (crucial, since books need category_ids)
-        Category::factory(8)->create();
+        // 3. Create English Categories
+        $categories = ['Fiction', 'Sci-Fi & Fantasy', 'Mystery & Thriller', 'Biography', 'History', 'Technology', 'Science', 'Romance'];
+        foreach ($categories as $categoryName) {
+            Category::factory()->create(['name' => $categoryName]);
+        }
 
-        // 4. Call the new Lab 7 MassBookSeeder!
-        // This will automatically read your .env SEED_BOOKS_COUNT and use the correct fields.
+        // 4. Run the 1-Million Book English Seeder
         $this->call([
             MassBookSeeder::class,
+        ]);
+
+        // 5. Run the new AI Showcase Seeder!
+        $this->call([
+            AiShowcaseSeeder::class,
         ]);
     }
 }
